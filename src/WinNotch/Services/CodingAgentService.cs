@@ -356,21 +356,21 @@ namespace WinNotch.Services
                 // Sort newest to oldest
                 allConversations.Sort((a, b) => b.FileInfo.LastWriteTime.CompareTo(a.FileInfo.LastWriteTime));
 
-                var addedChatIds = new HashSet<string>();
+                var addedChatIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+                // 1. Scan local conversations from brain paths
                 foreach (var item in allConversations)
                 {
                     try
                     {
                         double ageSec = (now - item.FileInfo.LastWriteTime).TotalSeconds;
-                        bool isChatWorking = ageSec >= 0 && ageSec < 60;
+                        // Extended active window: 120s ensures ongoing agent turn is not prematurely marked idle
+                        bool isChatWorking = ageSec >= 0 && ageSec < 120;
                         double ageHours = (now - item.FileInfo.LastWriteTime).TotalHours;
 
                         var (stepIndex, type, status, toolSummary, hasRealTool) = ReadLatestTranscriptLine(item.TranscriptPath);
-                        string chatTitle = GetChatTitle(item.Dir, item.TranscriptPath);
+                        string chatTitle = GetChatTitle(item.Dir.Name, item.TranscriptPath);
 
-                        // If chat is actively working, always include it!
-                        // If chat is idle, include if Antigravity is running and chat was touched recently (last 24 hours), up to 3 chats
                         bool shouldInclude = isChatWorking || (isAntigravityRunning && ageHours < 24 && addedChatIds.Count < 3);
 
                         if (shouldInclude && addedChatIds.Add(item.Dir.Name))
@@ -389,12 +389,12 @@ namespace WinNotch.Services
                                 BgColor = "#140E28",
                                 CurrentAction = actionText,
                                 StartedAt = item.FileInfo.LastWriteTime,
-                                IsRunning = isChatWorking, // true = green dot when working; false = grey dot when ready for instructions!
+                                IsRunning = isChatWorking,
                                 StatusColor = isChatWorking ? "#10B981" : "#71717A"
                             });
                         }
 
-                        // Track completed steps - NEVER LOG "Thinking..." TO HISTORY!
+                        // Track completed steps
                         int lastStep = _lastTranscriptSteps.TryGetValue(item.Dir.Name, out int s) ? s : -1;
                         if (stepIndex > lastStep)
                         {
@@ -430,12 +430,18 @@ namespace WinNotch.Services
                     }
                 }
 
-                // Fallback if Antigravity is open but no conversation file found in last 24h
+                // 2. Scan VS Code / Antigravity workspaceStorage (handles remote SSH/WSL workspaces like HistPrune-ViT)
+                if (isAntigravityRunning)
+                {
+                    ScanWorkspaceStorage(activeAgents, addedChatIds);
+                }
+
+                // Fallback if Antigravity is open but no active/recent conversation found
                 if (activeAgents.Count == 0 && isAntigravityRunning)
                 {
                     var latest = allConversations.FirstOrDefault();
                     string fallbackTitle = latest.Dir != null
-                        ? GetChatTitle(latest.Dir, latest.TranscriptPath)
+                        ? GetChatTitle(latest.Dir.Name, latest.TranscriptPath)
                         : "Antigravity IDE";
 
                     activeAgents.Add(new AgentInfo
@@ -448,12 +454,153 @@ namespace WinNotch.Services
                         BgColor = "#140E28",
                         CurrentAction = "Ready for instructions",
                         StartedAt = DateTime.Now,
-                        IsRunning = false, // Grey dot when ready for instructions!
+                        IsRunning = false,
                         StatusColor = "#71717A"
                     });
                 }
             }
             catch { }
+        }
+
+        private void ScanWorkspaceStorage(List<AgentInfo> activeAgents, HashSet<string> addedChatIds)
+        {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var wsStorageDir = Path.Combine(appData, "Antigravity IDE", "User", "workspaceStorage");
+                if (!Directory.Exists(wsStorageDir)) return;
+
+                var now = DateTime.Now;
+                var dirInfo = new DirectoryInfo(wsStorageDir);
+                var workspaces = dirInfo.GetDirectories()
+                    .OrderByDescending(d => d.LastWriteTime)
+                    .Take(15);
+
+                foreach (var ws in workspaces)
+                {
+                    try
+                    {
+                        var dbPath = Path.Combine(ws.FullName, "state.vscdb");
+                        if (!File.Exists(dbPath)) continue;
+
+                        var dbFi = new FileInfo(dbPath);
+                        double ageSec = (now - dbFi.LastWriteTime).TotalSeconds;
+                        double ageHours = (now - dbFi.LastWriteTime).TotalHours;
+
+                        // Only consider workspaces modified recently (last 8 hours)
+                        if (ageHours > 8) continue;
+
+                        // Check if this workspace has a custom session title or project folder
+                        string title = ExtractWorkspaceTitle(ws.FullName);
+                        if (string.IsNullOrWhiteSpace(title)) continue;
+
+                        // Check if already represented in activeAgents
+                        if (activeAgents.Any(a => a.AgentName.Equals(title, StringComparison.OrdinalIgnoreCase) ||
+                                                 a.AgentName.Contains(title, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            continue;
+                        }
+
+                        if (addedChatIds.Add(ws.Name))
+                        {
+                            // If state.vscdb was touched in last 120s, workspace session is actively working!
+                            bool isWorking = ageSec >= 0 && ageSec < 120;
+
+                            activeAgents.Add(new AgentInfo
+                            {
+                                Id = $"ws-{ws.Name}",
+                                ProcessId = Process.GetCurrentProcess().Id,
+                                AgentName = title,
+                                LogoKey = "Antigravity",
+                                AccentColor = isWorking ? "#10B981" : "#8B5CF6",
+                                BgColor = "#140E28",
+                                CurrentAction = isWorking ? "Running tasks..." : "Ready for instructions",
+                                StartedAt = dbFi.LastWriteTime,
+                                IsRunning = isWorking,
+                                StatusColor = isWorking ? "#10B981" : "#71717A"
+                            });
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
+
+        private string ExtractWorkspaceTitle(string wsDirectory)
+        {
+            string title = "";
+            try
+            {
+                var dbPath = Path.Combine(wsDirectory, "state.vscdb");
+                if (File.Exists(dbPath))
+                {
+                    using var fs = new FileStream(dbPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fs, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                    string content = reader.ReadToEnd();
+
+                    // Find description in artifactsEditorInput or history.entries
+                    var matches = Regex.Matches(content, @"antigravity\.artifactsEditorInput.*?description"":""([^""]{3,80})""", RegexOptions.Singleline);
+                    foreach (Match m in matches)
+                    {
+                        var val = m.Groups[1].Value.Trim();
+                        if (IsValidChatTitle(val))
+                        {
+                            return CleanTitle(val);
+                        }
+                    }
+
+                    // Fallback to any valid description in state.vscdb
+                    var descMatches = Regex.Matches(content, @"""description"":""([^""]{3,80})""");
+                    foreach (Match m in descMatches)
+                    {
+                        var val = m.Groups[1].Value.Trim();
+                        if (IsValidChatTitle(val))
+                        {
+                            return CleanTitle(val);
+                        }
+                    }
+                }
+
+                // If no session description found, use the clean folder name from workspace.json
+                var wsJson = Path.Combine(wsDirectory, "workspace.json");
+                if (File.Exists(wsJson))
+                {
+                    var jsonContent = File.ReadAllText(wsJson);
+                    using var doc = JsonDocument.Parse(jsonContent);
+                    if (doc.RootElement.TryGetProperty("folder", out var folderProp))
+                    {
+                        var folder = folderProp.GetString() ?? "";
+                        var folderName = folder.TrimEnd('/').Split('/').Last();
+                        folderName = Uri.UnescapeDataString(folderName);
+                        if (!string.IsNullOrWhiteSpace(folderName))
+                        {
+                            return CleanTitle(folderName);
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            return title;
+        }
+
+        private static bool IsValidChatTitle(string val)
+        {
+            if (string.IsNullOrWhiteSpace(val)) return false;
+            if (val.Equals("Artifact", StringComparison.OrdinalIgnoreCase)) return false;
+            if (val.StartsWith("You are", StringComparison.OrdinalIgnoreCase)) return false;
+            if (val.StartsWith("I will", StringComparison.OrdinalIgnoreCase)) return false;
+            if (val.StartsWith("Enables ", StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+
+        private static string CleanTitle(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "Antigravity";
+            var clean = raw.Trim();
+            if (clean.Length > 35) clean = clean.Substring(0, 32).TrimEnd() + "...";
+            return clean;
         }
 
         private static (int StepIndex, string Type, string Status, string ToolSummary, bool HasRealTool) ReadLatestTranscriptLine(string transcriptPath)
@@ -521,53 +668,99 @@ namespace WinNotch.Services
             }
         }
 
-        private string GetChatTitle(DirectoryInfo conv, string transcriptPath)
+        private string GetChatTitle(string convId, string transcriptPath)
         {
-            if (_chatTitles.TryGetValue(conv.Name, out var cached))
+            if (_chatTitles.TryGetValue(convId, out var cached))
             {
                 return cached;
             }
 
-            string title = "Antigravity";
+            string title = "";
             try
             {
                 using var fs = new FileStream(transcriptPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var reader = new StreamReader(fs);
-                string? firstLine = reader.ReadLine();
-                if (!string.IsNullOrWhiteSpace(firstLine))
+
+                string? line0 = reader.ReadLine();
+                if (!string.IsNullOrWhiteSpace(line0))
                 {
-                    var matchRepo = Regex.Match(firstLine, @"(?:Repository|workspace|projects?)[\\/]([a-zA-Z0-9_\-\.]+)", RegexOptions.IgnoreCase);
+                    // 1. Try matching workspace/repository path in transcript context
+                    var matchRepo = Regex.Match(line0, @"(?:Repository|workspace|projects?)[\\/]([a-zA-Z0-9_\-\.]+)", RegexOptions.IgnoreCase);
                     if (matchRepo.Success && matchRepo.Groups.Count > 1)
                     {
                         var repo = matchRepo.Groups[1].Value.Trim();
-                        if (!string.Equals(repo, "Repository", StringComparison.OrdinalIgnoreCase))
+                        if (!string.Equals(repo, "Repository", StringComparison.OrdinalIgnoreCase) &&
+                            !string.Equals(repo, "workspace", StringComparison.OrdinalIgnoreCase))
                         {
-                            title = $"Antigravity · {repo}";
+                            title = CleanTitle(repo);
                         }
                     }
 
-                    if (title == "Antigravity")
+                    if (string.IsNullOrWhiteSpace(title))
                     {
-                        var matchCorpus = Regex.Match(firstLine, @"->\s*([a-zA-Z0-9_\-\./]+)");
+                        var matchCorpus = Regex.Match(line0, @"->\s*([a-zA-Z0-9_\-\./]+)");
                         if (matchCorpus.Success && matchCorpus.Groups.Count > 1)
                         {
                             var name = matchCorpus.Groups[1].Value.Trim().Split('/').Last();
                             if (!string.IsNullOrWhiteSpace(name))
                             {
-                                title = $"Antigravity · {name}";
+                                title = CleanTitle(name);
                             }
                         }
+                    }
+
+                    // 2. Extract clean request summary from user prompt in step 0
+                    if (string.IsNullOrWhiteSpace(title))
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(line0);
+                            if (doc.RootElement.TryGetProperty("content", out var contentProp))
+                            {
+                                var content = contentProp.GetString() ?? "";
+                                var promptMatch = Regex.Match(content, @"<USER_REQUEST>(.*?)</USER_REQUEST>", RegexOptions.Singleline);
+                                var reqText = promptMatch.Success ? promptMatch.Groups[1].Value : content;
+
+                                // Strip slash commands (/plan, /goal, etc.)
+                                reqText = Regex.Replace(reqText, @"^/(?:plan|goal|commit|review|test|fix|audit)\s+", "", RegexOptions.IgnoreCase).Trim();
+                                reqText = Regex.Replace(reqText, @"<[^>]+>", "").Trim();
+
+                                var firstSentence = reqText.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                                firstSentence = firstSentence.Trim();
+
+                                // Strip filler beginnings
+                                string[] fillers = new[] { "i want to build a ", "i want to build ", "build a ", "build ", "help me build a ", "help me build ", "act as " };
+                                foreach (var f in fillers)
+                                {
+                                    if (firstSentence.StartsWith(f, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        firstSentence = firstSentence.Substring(f.Length).Trim();
+                                        break;
+                                    }
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(firstSentence))
+                                {
+                                    if (char.IsLower(firstSentence[0]))
+                                    {
+                                        firstSentence = char.ToUpper(firstSentence[0]) + firstSentence.Substring(1);
+                                    }
+                                    title = CleanTitle(firstSentence);
+                                }
+                            }
+                        }
+                        catch { }
                     }
                 }
             }
             catch { }
 
-            if (title == "Antigravity")
+            if (string.IsNullOrWhiteSpace(title))
             {
-                title = $"Antigravity · #{conv.Name.Substring(0, Math.Min(4, conv.Name.Length))}";
+                title = "Antigravity Chat";
             }
 
-            _chatTitles[conv.Name] = title;
+            _chatTitles[convId] = title;
             return title;
         }
 

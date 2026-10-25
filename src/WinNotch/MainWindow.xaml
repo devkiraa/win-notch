@@ -1,0 +1,1021 @@
+<Window x:Class="WinNotch.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:WinNotch"
+        xmlns:vm="clr-namespace:WinNotch.ViewModels"
+        xmlns:models="clr-namespace:WinNotch.Models"
+        mc:Ignorable="d"
+        Title="WinNotch"
+        Width="520" Height="360"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="Manual"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        Loaded="Window_Loaded"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewKeyUp="Window_PreviewKeyUp">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+        <local:TodoStrikeThroughConverter x:Key="StrikeThroughConv" />
+    </Window.Resources>
+
+    <!-- Outer Click Catcher to Collapse when clicking outside the notch -->
+    <Grid Background="Transparent" MouseDown="OuterGrid_MouseDown">
+
+        <!-- Dynamic Island / Notch Container (Solid Pure Black, Crisp Apple-Style Rim) -->
+        <Border x:Name="NotchBorder"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Width="160"
+                Height="32"
+                Margin="0,4,0,0"
+                CornerRadius="16"
+                Background="{StaticResource IslandBgBrush}"
+                BorderBrush="{StaticResource IslandBorderBrush}"
+                BorderThickness="1"
+                ClipToBounds="True"
+                Cursor="Hand"
+                PreviewMouseDown="NotchBorder_PreviewMouseDown"
+                PreviewMouseWheel="NotchBorder_PreviewMouseWheel"
+                MouseDown="NotchBorder_MouseDown"
+                MouseMove="NotchBorder_MouseMove"
+                MouseEnter="NotchBorder_MouseEnter"
+                MouseLeave="NotchBorder_MouseLeave">
+
+            <Grid>
+                <!-- ============================================== -->
+                <!-- 1. COLLAPSED STATE (Idle, Alert, Agent, Media) -->
+                <!-- ============================================== -->
+                <Grid x:Name="CollapsedView"
+                      Visibility="{Binding IsExpanded, Converter={StaticResource InverseBoolToVis}}"
+                      VerticalAlignment="Center"
+                      Margin="10,0">
+
+                    <!-- MICRO-ALERT PILL (Caps Lock / Battery / Completed Step) -->
+                    <Grid Visibility="{Binding HasActiveAlert, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding AlertSymbol}" FontSize="12" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding AlertMessage}" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- REGULAR COLLAPSED CONTENT (Hidden during alerts) -->
+                    <Grid Visibility="{Binding HasActiveAlert, Converter={StaticResource InverseBoolToVis}}">
+
+                        <!-- CODING AGENT LIVE PILL (When any agent is running) -->
+                        <Grid Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource BoolToVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0" Width="18" Height="18" Margin="0,0,7,0" VerticalAlignment="Center">
+                                <Border Width="18" Height="18" CornerRadius="9" Background="#140E28" BorderBrush="#8B5CF6" BorderThickness="1">
+                                    <TextBlock Text="🤖" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding Agent.PillDisplay}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+
+                            <Border Grid.Column="2" Background="#8B5CF6" CornerRadius="6" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} run'}" FontSize="8.5" FontWeight="Bold" Foreground="#FFFFFF" />
+                            </Border>
+                        </Grid>
+
+                        <!-- NON-AGENT COLLAPSED CONTENT (When no agents running) -->
+                        <Grid Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource InverseBoolToVis}}">
+
+                            <!-- IDLE NOTCH (MacBook Camera / Dynamic Island pill) -->
+                            <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Media.HasMedia}" Value="False" />
+                                                    <Condition Binding="{Binding Focus.IsRunning}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#121215" BorderBrush="#202026" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="WinNotch" FontSize="11" FontWeight="Medium" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- FOCUS TIMER ONLY (When no media playing) -->
+                            <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding Media.HasMedia}" Value="False" />
+                                                    <Condition Binding="{Binding Focus.IsRunning}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="⏱" FontSize="11" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Focus.PillDisplay}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- LIVE MEDIA COMPACT PILL -->
+                            <Grid Visibility="{Binding Media.HasMedia, Converter={StaticResource BoolToVis}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Mini Vinyl Disc -->
+                                <Grid Grid.Column="0" Width="18" Height="18" Margin="0,0,7,0" VerticalAlignment="Center">
+                                    <Grid x:Name="MiniVinylDisc" Width="18" Height="18" RenderTransformOrigin="0.5,0.5">
+                                        <Grid.RenderTransform>
+                                            <RotateTransform x:Name="MiniVinylRotation" Angle="0" />
+                                        </Grid.RenderTransform>
+                                        <Border Width="18" Height="18" CornerRadius="9" Background="#0C0C0E" BorderBrush="#24242A" BorderThickness="0.8" ClipToBounds="True">
+                                            <Grid>
+                                                <Image Source="{Binding Media.Thumbnail}" Stretch="UniformToFill" Width="18" Height="18">
+                                                    <Image.Clip>
+                                                        <EllipseGeometry Center="9,9" RadiusX="9" RadiusY="9" />
+                                                    </Image.Clip>
+                                                </Image>
+                                                <Path Data="M 8,1.5 L 3,3.5 L 3,9.5 C 2.5,9.2 1.8,9.2 1.2,9.6 C 0.4,10.1 0,11 0.3,11.8 C 0.6,12.6 1.5,13 2.3,12.5 C 3,12.1 3.5,11.2 3.5,10.3 L 3.5,5 L 7.5,3.4 L 7.5,8 C 7,7.7 6.3,7.7 5.7,8.1 C 4.9,8.6 4.5,9.5 4.8,10.3 C 5.1,11.1 6,11.5 6.8,11 C 7.5,10.6 8,9.7 8,8.8 Z"
+                                                      Fill="{StaticResource AccentBlueBrush}"
+                                                      Width="8" Height="9" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                      Visibility="{Binding Media.Thumbnail, Converter={StaticResource InverseBoolToVis}}" />
+                                            </Grid>
+                                        </Border>
+                                        <Border Width="4" Height="4" CornerRadius="2" Background="#000000" BorderBrush="#3E3E48" BorderThickness="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Grid>
+
+                                <!-- Track Title -->
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Media.Title}"
+                                           FontSize="11"
+                                           FontWeight="Medium"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
+
+                                <!-- Flank: Equalizer or Focus Timer Countdown -->
+                                <Grid Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Visibility="{Binding Focus.IsRunning, Converter={StaticResource InverseBoolToVis}}">
+                                        <Border x:Name="EqBar1" Width="2.5" Height="8" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                                        <Border x:Name="EqBar2" Width="2.5" Height="14" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                                        <Border x:Name="EqBar3" Width="2.5" Height="6" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                                    </StackPanel>
+
+                                    <Border Background="#1C1C1E" CornerRadius="6" Padding="5,1" Visibility="{Binding Focus.IsRunning, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding Focus.PillDisplay}" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource AccentBlueBrush}" />
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Grid>
+
+
+                <!-- ============================================== -->
+                <!-- 2. EXPANDED STATE (Agents, Music, Todos, etc.) -->
+                <!-- ============================================== -->
+                <Grid x:Name="ExpandedView"
+                      Visibility="{Binding IsExpanded, Converter={StaticResource BoolToVis}}"
+                      Margin="14,10"
+                      RenderTransformOrigin="0.5,0">
+                    <Grid.RenderTransform>
+                        <TranslateTransform x:Name="ExpandedTranslate" Y="0" />
+                    </Grid.RenderTransform>
+                    <Grid.RowDefinitions>
+                        <!-- Navigation Header -->
+                        <RowDefinition Height="Auto" />
+                        <!-- Content Body -->
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Header Row -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <!-- Apple Segmented Navigation Pills -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+
+                            <!-- 1. AI Agents Tab -->
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding SetTabCommand}"
+                                    CommandParameter="Agents"
+                                    Background="{Binding ActiveTab, Converter={local:TabToActiveBrushConverter TargetTab=Agents}}"
+                                    Foreground="{Binding ActiveTab, Converter={local:TabToActiveForegroundConverter TargetTab=Agents}}"
+                                    Padding="7,3.5">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="🤖" FontSize="9.5" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Agents" FontSize="10.5" />
+                                    <Border Background="#8B5CF6" CornerRadius="5" Padding="3.5,0.5" Margin="4,0,0,0"
+                                            Visibility="{Binding Agent.ActiveCount, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding Agent.ActiveCount}" FontSize="8" FontWeight="Bold" Foreground="#FFFFFF" />
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 2. Music Tab -->
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding SetTabCommand}"
+                                    CommandParameter="Music"
+                                    Background="{Binding ActiveTab, Converter={local:TabToActiveBrushConverter TargetTab=Music}}"
+                                    Foreground="{Binding ActiveTab, Converter={local:TabToActiveForegroundConverter TargetTab=Music}}"
+                                    Padding="7,3.5"
+                                    Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M 8,1.5 L 3,3.5 L 3,9.5 C 2.5,9.2 1.8,9.2 1.2,9.6 C 0.4,10.1 0,11 0.3,11.8 C 0.6,12.6 1.5,13 2.3,12.5 C 3,12.1 3.5,11.2 3.5,10.3 L 3.5,5 L 7.5,3.4 L 7.5,8 C 7,7.7 6.3,7.7 5.7,8.1 C 4.9,8.6 4.5,9.5 4.8,10.3 C 5.1,11.1 6,11.5 6.8,11 C 7.5,10.6 8,9.7 8,8.8 Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          Width="8.5" Height="9.5" Stretch="Uniform" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Music" FontSize="10.5" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 3. Todo Tab -->
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding SetTabCommand}"
+                                    CommandParameter="Todo"
+                                    Background="{Binding ActiveTab, Converter={local:TabToActiveBrushConverter TargetTab=Todo}}"
+                                    Foreground="{Binding ActiveTab, Converter={local:TabToActiveForegroundConverter TargetTab=Todo}}"
+                                    Padding="7,3.5"
+                                    Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M 0,3 L 3,6 L 8,1 M 0,8.5 L 3,11.5 L 8,6.5"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="8.5" Height="8.5" Stretch="Uniform" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Todos" FontSize="10.5" />
+                                    <Border Background="{StaticResource AccentBlueBrush}" CornerRadius="5" Padding="3.5,0.5" Margin="4,0,0,0"
+                                            Visibility="{Binding Todo.ActiveCount, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding Todo.ActiveCount}" FontSize="8" FontWeight="Bold" Foreground="#FFFFFF" />
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 4. Focus Timer Tab -->
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding SetTabCommand}"
+                                    CommandParameter="Focus"
+                                    Background="{Binding ActiveTab, Converter={local:TabToActiveBrushConverter TargetTab=Focus}}"
+                                    Foreground="{Binding ActiveTab, Converter={local:TabToActiveForegroundConverter TargetTab=Focus}}"
+                                    Padding="7,3.5"
+                                    Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M 5,0 L 5,2 M 1,2 L 9,2 M 5,5 L 5,8 L 7,8 M 5,14 A 6,6 0 1 0 5,2 A 6,6 0 1 0 5,14"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="8.5" Height="8.5" Stretch="Uniform" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Focus" FontSize="10.5" />
+                                    <Border Background="{StaticResource AccentBlueBrush}" CornerRadius="4" Width="6" Height="6" Margin="4,0,0,0"
+                                            Visibility="{Binding Focus.IsRunning, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 5. Clipboard History Tab -->
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding SetTabCommand}"
+                                    CommandParameter="Clips"
+                                    Background="{Binding ActiveTab, Converter={local:TabToActiveBrushConverter TargetTab=Clips}}"
+                                    Foreground="{Binding ActiveTab, Converter={local:TabToActiveForegroundConverter TargetTab=Clips}}"
+                                    Padding="7,3.5"
+                                    Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M 3,1 L 3,3 L 7,3 L 7,1 Z M 1,3 L 1,11 L 9,11 L 9,3 Z"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          Width="8.5" Height="8.5" Stretch="Uniform" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Clips" FontSize="10.5" />
+                                    <Border Background="#24242A" CornerRadius="5" Padding="3.5,0.5" Margin="4,0,0,0"
+                                            Visibility="{Binding Clips.Count, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding Clips.Count}" FontSize="8" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- 6. Settings Tab -->
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding SetTabCommand}"
+                                    CommandParameter="Settings"
+                                    Background="{Binding ActiveTab, Converter={local:TabToActiveBrushConverter TargetTab=Settings}}"
+                                    Foreground="{Binding ActiveTab, Converter={local:TabToActiveForegroundConverter TargetTab=Settings}}"
+                                    Padding="7,3.5"
+                                    Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M 5,0 L 7,0 L 7.3,1.8 C 7.7,2 8.1,2.2 8.5,2.5 L 10.1,1.6 L 11.4,2.9 L 10.5,4.5 C 10.8,4.9 11,5.3 11.2,5.7 L 13,6 L 13,8 L 11.2,8.3 C 11,8.7 10.8,9.1 10.5,9.5 L 11.4,11.1 L 10.1,12.4 L 8.5,11.5 C 8.1,11.8 7.7,12 7.3,12.2 L 7,14 L 5,14 L 4.7,12.2 C 4.3,12 3.9,11.8 3.5,11.5 L 1.9,12.4 L 0.6,11.1 L 1.5,9.5 C 1.2,9.1 1,8.7 0.8,8.3 L -1,8 L -1,6 L 0.8,5.7 C 1,5.3 1.2,4.9 1.5,4.5 L 0.6,2.9 L 1.9,1.6 L 3.5,2.5 C 3.9,2.2 4.3,2 4.7,1.8 Z M 6,4.5 C 4.9,4.5 4,5.4 4,6.5 C 4,7.6 4.9,8.5 6,8.5 C 7.1,8.5 8,7.6 8,6.5 C 8,5.4 7.1,4.5 6,4.5 Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          Width="8.5" Height="8.5" Stretch="Uniform" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="Settings" FontSize="10.5" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Close / Collapse Button -->
+                        <Button Style="{StaticResource IconButton}"
+                                HorizontalAlignment="Right"
+                                Command="{Binding CollapseCommand}"
+                                Width="22" Height="22" ToolTip="Collapse">
+                            <Path Data="M 1,1 L 7,7 M 7,1 L 1,7"
+                                  Stroke="{StaticResource TextMutedBrush}"
+                                  StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  Width="8" Height="8" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Button>
+                    </Grid>
+
+
+                    <!-- ============================================== -->
+                    <!-- TAB 0: AI CODING AGENTS MONITOR                -->
+                    <!-- ============================================== -->
+                    <Grid Grid.Row="1" Visibility="{Binding ActiveTab, Converter={local:TabToVisibilityConverter CurrentTab=Agents}}" Margin="0,2,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Stats Bar -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,4,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#8B5CF6" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} Active'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Terminal &amp; IDE" FontSize="9" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Column="1" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="4,0,0,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#10B981" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Agent.CompletedCount, StringFormat='{}{0} Steps'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Recent Logged" FontSize="9" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Active Agents List & Recent History -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,6">
+                            <StackPanel>
+                                <!-- Idle Empty State -->
+                                <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,14" Margin="0,0,0,6"
+                                        Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource InverseBoolToVis}}">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Text="⚡ Coding Agents Standing By" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Run 'agy' in terminal or Antigravity to stream live actions" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Active Agents Cards -->
+                                <ItemsControl ItemsSource="{Binding Agent.ActiveAgents}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type models:AgentInfo}">
+                                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6.5" Margin="0,0,0,5">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Border Grid.Column="0" Width="24" Height="24" CornerRadius="6" Background="#140E28" BorderBrush="#8B5CF6" BorderThickness="0.8" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="🤖" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding AgentName}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                            <TextBlock Text="{Binding ElapsedText, StringFormat='· {0}'}" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding CurrentAction}" FontSize="10" Foreground="#A78BFA" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                                    </StackPanel>
+
+                                                    <Button Grid.Column="2"
+                                                            Style="{StaticResource IconButton}"
+                                                            Command="{Binding DataContext.Agent.KillAgentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Width="20" Height="20"
+                                                            ToolTip="Stop Process"
+                                                            Visibility="{Binding ProcessId, Converter={StaticResource BoolToVis}}"
+                                                            VerticalAlignment="Center">
+                                                        <Path Data="M 2,2 L 8,8 M 8,2 L 2,8" Stroke="{StaticResource DangerBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="7" Height="7" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Recent Completed Tasks Header -->
+                                <TextBlock Text="COMPLETED ACTIONS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="2,4,0,4"
+                                           Visibility="{Binding Agent.CompletedCount, Converter={StaticResource BoolToVis}}" />
+
+                                <!-- Recent Completed Tasks List -->
+                                <ItemsControl ItemsSource="{Binding Agent.CompletedTasks}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type models:AgentTaskHistory}">
+                                            <Border Background="#09090C" BorderBrush="#16161A" BorderThickness="1" CornerRadius="6" Padding="8,4.5" Margin="0,0,0,3">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <TextBlock Grid.Column="0" Text="{Binding StatusSymbol}" FontSize="9" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding ActionName}" FontSize="9.5" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding FormattedTime}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Footer -->
+                        <Grid Grid.Row="2">
+                            <TextBlock HorizontalAlignment="Left" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}">
+                                <Run Text="{Binding Agent.CompletedCount, Mode=OneWay}" />
+                                <Run Text="steps logged" />
+                            </TextBlock>
+
+                            <Button HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Command="{Binding Agent.ClearHistoryCommand}">
+                                <TextBlock Text="Clear history" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+
+                    <!-- ============================================== -->
+                    <!-- TAB 1: MUSIC PLAYER                            -->
+                    <!-- ============================================== -->
+                    <Grid Grid.Row="1" Visibility="{Binding ActiveTab, Converter={local:TabToVisibilityConverter CurrentTab=Music}}" Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Realistic Spinning Vinyl Record Disc (76x76) -->
+                        <Grid Grid.Column="0" Width="76" Height="76" Margin="0,0,13,0" VerticalAlignment="Center">
+                            <Border Width="76" Height="76" CornerRadius="38" Background="#0A0A0C" BorderBrush="#202024" BorderThickness="1" />
+
+                            <Grid x:Name="VinylDisc" Width="76" Height="76" RenderTransformOrigin="0.5,0.5">
+                                <Grid.RenderTransform>
+                                    <RotateTransform x:Name="VinylRotation" Angle="0" />
+                                </Grid.RenderTransform>
+
+                                <Border Width="74" Height="74" CornerRadius="37" Background="#0E0E12" BorderBrush="#1A1A1E" BorderThickness="0.8" />
+                                <Ellipse Width="72" Height="72" Stroke="#15151A" StrokeThickness="0.75" />
+                                <Ellipse Width="68" Height="68" Stroke="#1A1A22" StrokeThickness="0.75" />
+                                <Ellipse Width="64" Height="64" Stroke="#141418" StrokeThickness="0.75" />
+                                <Ellipse Width="60" Height="60" Stroke="#1D1D26" StrokeThickness="0.75" />
+                                <Ellipse Width="56" Height="56" Stroke="#24242F" StrokeThickness="0.75" />
+
+                                <Border Width="74" Height="74" CornerRadius="37" Opacity="0.09">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#00FFFFFF" Offset="0.0" />
+                                            <GradientStop Color="#88FFFFFF" Offset="0.25" />
+                                            <GradientStop Color="#00FFFFFF" Offset="0.5" />
+                                            <GradientStop Color="#88FFFFFF" Offset="0.75" />
+                                            <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+
+                                <Grid Width="52" Height="52">
+                                    <Image Source="{Binding Media.Thumbnail}" Stretch="UniformToFill" Width="52" Height="52">
+                                        <Image.Clip>
+                                            <EllipseGeometry Center="26,26" RadiusX="26" RadiusY="26" />
+                                        </Image.Clip>
+                                    </Image>
+                                    <Grid Visibility="{Binding Media.Thumbnail, Converter={StaticResource InverseBoolToVis}}">
+                                        <Ellipse Width="52" Height="52" Fill="#12151D" />
+                                        <Path Data="M 8,1.5 L 3,3.5 L 3,9.5 C 2.5,9.2 1.8,9.2 1.2,9.6 C 0.4,10.1 0,11 0.3,11.8 C 0.6,12.6 1.5,13 2.3,12.5 C 3,12.1 3.5,11.2 3.5,10.3 L 3.5,5 L 7.5,3.4 L 7.5,8 C 7,7.7 6.3,7.7 5.7,8.1 C 4.9,8.6 4.5,9.5 4.8,10.3 C 5.1,11.1 6,11.5 6.8,11 C 7.5,10.6 8,9.7 8,8.8 Z"
+                                              Fill="{StaticResource AccentBlueBrush}"
+                                              Width="18" Height="20" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Ellipse Width="52" Height="52" Stroke="#2A2A34" StrokeThickness="1" />
+                                    <Ellipse Width="24" Height="24" Stroke="#28FFFFFF" StrokeThickness="0.6" />
+                                </Grid>
+
+                                <Border Width="7" Height="7" CornerRadius="3.5" Background="#000000" BorderBrush="#555562" BorderThickness="0.9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+                        </Grid>
+
+                        <!-- Track Info, Timeline & Controls -->
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Text="{Binding Media.Title}" FontSize="13.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Media.Artist}" FontSize="11.5" Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                            </StackPanel>
+
+                            <!-- Interactive Timeline Scrubber -->
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0"
+                                      Height="10"
+                                      Cursor="Hand"
+                                      Background="Transparent"
+                                      ToolTip="Click to seek"
+                                      PreviewMouseDown="ProgressBar_PreviewMouseDown">
+                                    <ProgressBar Value="{Binding Media.ProgressValue}"
+                                                 VerticalAlignment="Center"
+                                                 Style="{StaticResource AppleProgressBar}"
+                                                 IsHitTestVisible="False" />
+                                </Grid>
+
+                                <Grid Grid.Row="1" Margin="0,2,0,0">
+                                    <TextBlock Text="{Binding Media.ElapsedText}" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Left" />
+                                    <TextBlock Text="{Binding Media.TotalText}" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" />
+                                </Grid>
+                            </Grid>
+
+                            <!-- Playback Controls -->
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,6,0,0">
+                                <Button Style="{StaticResource IconButton}" Command="{Binding Media.PreviousCommand}" Width="30" Height="30" Margin="0,0,12,0" ToolTip="Previous">
+                                    <Canvas Width="14" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Rectangle Canvas.Left="0" Canvas.Top="0.5" Width="2.2" Height="11" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        <Path Canvas.Left="2.5" Canvas.Top="0.5" Data="M 10,0 L 0,5.5 L 10,11 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    </Canvas>
+                                </Button>
+
+                                <Button Command="{Binding Media.PlayPauseCommand}" Width="36" Height="36" Cursor="Hand" ToolTip="Play / Pause" FocusVisualStyle="{x:Null}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="PlayCircle" CornerRadius="18" Background="{StaticResource AccentBlueBrush}" RenderTransformOrigin="0.5,0.5">
+                                                <Border.RenderTransform>
+                                                    <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
+                                                </Border.RenderTransform>
+                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="PlayCircle" Property="Background" Value="{StaticResource AccentBlueHoverBrush}" />
+                                                </Trigger>
+                                                <Trigger Property="IsPressed" Value="True">
+                                                    <Setter TargetName="PlayCircle" Property="Background" Value="{StaticResource AccentBluePressedBrush}" />
+                                                    <Setter TargetName="PlayCircle" Property="RenderTransform">
+                                                        <Setter.Value>
+                                                            <ScaleTransform ScaleX="0.92" ScaleY="0.92" />
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Grid Width="12" Height="13" Visibility="{Binding Media.IsPlaying, Converter={StaticResource BoolToVis}}">
+                                            <Rectangle Width="3.5" Height="13" RadiusX="1.2" RadiusY="1.2" Fill="#FFFFFF" HorizontalAlignment="Left" />
+                                            <Rectangle Width="3.5" Height="13" RadiusX="1.2" RadiusY="1.2" Fill="#FFFFFF" HorizontalAlignment="Right" />
+                                        </Grid>
+                                        <Path Data="M 2.5,1.5 L 12.5,7.5 L 2.5,13.5 Z" Fill="#FFFFFF" Width="11" Height="13" Stretch="Fill" Margin="2,0,0,0" Visibility="{Binding Media.IsPlaying, Converter={StaticResource InverseBoolToVis}}" />
+                                    </Grid>
+                                </Button>
+
+                                <Button Style="{StaticResource IconButton}" Command="{Binding Media.NextCommand}" Width="30" Height="30" Margin="12,0,0,0" ToolTip="Next">
+                                    <Canvas Width="14" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Path Canvas.Left="0.5" Canvas.Top="0.5" Data="M 0,0 L 10,5.5 L 0,11 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                        <Rectangle Canvas.Left="11.2" Canvas.Top="0.5" Width="2.2" Height="11" RadiusX="0.8" RadiusY="0.8" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                                    </Canvas>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+
+                    <!-- ============================================== -->
+                    <!-- TAB 2: TODOS CHECKLIST                         -->
+                    <!-- ============================================== -->
+                    <Grid Grid.Row="1" Visibility="{Binding ActiveTab, Converter={local:TabToVisibilityConverter CurrentTab=Todo}}" Margin="0,2,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Add Task Input Row -->
+                        <Grid Grid.Row="0" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9,5">
+                                <TextBox x:Name="TodoInputBox"
+                                         Text="{Binding Todo.NewTodoText, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         CaretBrush="{StaticResource AccentBlueBrush}"
+                                         FontSize="11.5"
+                                         KeyDown="TodoInputBox_KeyDown" />
+                            </Border>
+
+                            <Button Grid.Column="1" Command="{Binding Todo.AddTodoCommand}" Background="{StaticResource AccentBlueBrush}" BorderThickness="0" Cursor="Hand" Margin="6,0,0,0" Width="30" Height="28">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="AddBtnBorder" Background="{TemplateBinding Background}" CornerRadius="7">
+                                            <Path Data="M 4,0 L 4,8 M 0,4 L 8,4" Stroke="#FFFFFF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="9" Height="9" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="AddBtnBorder" Property="Background" Value="{StaticResource AccentBlueHoverBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsPressed" Value="True">
+                                                <Setter TargetName="AddBtnBorder" Property="Background" Value="{StaticResource AccentBluePressedBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+
+                        <!-- Task Items List -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,6">
+                            <ItemsControl ItemsSource="{Binding Todo.Items}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:TodoItem}">
+                                        <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="9,5" Margin="0,2">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <CheckBox Grid.Column="0" IsChecked="{Binding IsCompleted, Mode=TwoWay}" Style="{StaticResource ModernCheckBox}" />
+                                                <TextBlock Grid.Column="1" Text="{Binding Text}" FontSize="11.5" TextDecorations="{Binding IsCompleted, Converter={StaticResource StrikeThroughConv}}" Foreground="{Binding IsCompleted, Converter={local:CompletedColorConverter}}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <Button Grid.Column="2" Style="{StaticResource IconButton}" Command="{Binding DataContext.Todo.DeleteTodoCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Width="18" Height="18" Margin="4,0,0,0">
+                                                    <Path Data="M 1,1 L 7,7 M 7,1 L 1,7" Stroke="{StaticResource TextMutedBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="7" Height="7" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- Footer -->
+                        <Grid Grid.Row="2">
+                            <TextBlock HorizontalAlignment="Left" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}">
+                                <Run Text="{Binding Todo.ActiveCount, Mode=OneWay}" />
+                                <Run Text="active ·" />
+                                <Run Text="{Binding Todo.CompletedCount, Mode=OneWay}" />
+                                <Run Text="done" />
+                            </TextBlock>
+
+                            <Button HorizontalAlignment="Right" Background="Transparent" BorderThickness="0" Cursor="Hand" Command="{Binding Todo.ClearCompletedCommand}">
+                                <TextBlock Text="Clear completed" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+
+                    <!-- ============================================== -->
+                    <!-- TAB 3: FOCUS / POMODORO TIMER                  -->
+                    <!-- ============================================== -->
+                    <Grid Grid.Row="1" Visibility="{Binding ActiveTab, Converter={local:TabToVisibilityConverter CurrentTab=Focus}}" Margin="0,2,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Presets -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <Button Style="{StaticResource TabButton}" Command="{Binding Focus.SelectPresetCommand}" CommandParameter="5" Background="#141416" Padding="12,3" Margin="0,0,6,0">
+                                <TextBlock Text="5 min" FontSize="10.5" />
+                            </Button>
+                            <Button Style="{StaticResource TabButton}" Command="{Binding Focus.SelectPresetCommand}" CommandParameter="15" Background="#141416" Padding="12,3" Margin="0,0,6,0">
+                                <TextBlock Text="15 min" FontSize="10.5" />
+                            </Button>
+                            <Button Style="{StaticResource TabButton}" Command="{Binding Focus.SelectPresetCommand}" CommandParameter="25" Background="#141416" Padding="12,3" Margin="0,0,6,0">
+                                <TextBlock Text="25 min" FontSize="10.5" />
+                            </Button>
+                            <Button Style="{StaticResource TabButton}" Command="{Binding Focus.SelectPresetCommand}" CommandParameter="45" Background="#141416" Padding="12,3">
+                                <TextBlock Text="45 min" FontSize="10.5" />
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Digital Countdown & Progress -->
+                        <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Focus.FormattedTime}"
+                                       FontSize="40"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4" />
+                            <ProgressBar Value="{Binding Focus.ProgressValue}"
+                                         Width="180" Height="3"
+                                         Style="{StaticResource AppleProgressBar}"
+                                         HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <!-- Actions -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                            <Button Command="{Binding Focus.ToggleStartPauseCommand}"
+                                    Background="{StaticResource AccentBlueBrush}"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Padding="18,5"
+                                    Margin="0,0,10,0">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="StartBtn" Background="{TemplateBinding Background}" CornerRadius="12" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="StartBtn" Property="Background" Value="{StaticResource AccentBlueHoverBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Pause" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                               Visibility="{Binding Focus.IsRunning, Converter={StaticResource BoolToVis}}" />
+                                    <TextBlock Text="Start Focus" FontSize="11" FontWeight="SemiBold" Foreground="#FFFFFF"
+                                               Visibility="{Binding Focus.IsRunning, Converter={StaticResource InverseBoolToVis}}" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Style="{StaticResource TabButton}"
+                                    Command="{Binding Focus.ResetCommand}"
+                                    Background="#141416"
+                                    Foreground="{StaticResource TextMutedBrush}"
+                                    Padding="14,5">
+                                <TextBlock Text="Reset" FontSize="11" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+
+                    <!-- ============================================== -->
+                    <!-- TAB 4: CLIPBOARD HISTORY DRAWER                -->
+                    <!-- ============================================== -->
+                    <Grid Grid.Row="1" Visibility="{Binding ActiveTab, Converter={local:TabToVisibilityConverter CurrentTab=Clips}}" Margin="0,2,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Clips List -->
+                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,6">
+                            <Grid>
+                                <TextBlock Text="Copy any text to see clips here"
+                                           FontSize="11"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Margin="0,40,0,0"
+                                           Visibility="{Binding Clips.Count, Converter={StaticResource InverseBoolToVis}}" />
+
+                                <ItemsControl ItemsSource="{Binding Clips.Items}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type models:ClipboardItem}">
+                                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="7" Padding="10,6" Margin="0,2.5">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding PreviewText}" FontSize="11" FontWeight="Medium" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" MaxHeight="32" />
+                                                        <TextBlock Text="{Binding TimeAgo}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" />
+                                                    </StackPanel>
+
+                                                    <Button Grid.Column="1"
+                                                            Command="{Binding DataContext.Clips.CopyClipCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Background="#141418"
+                                                            BorderThickness="0"
+                                                            Cursor="Hand"
+                                                            Padding="8,3"
+                                                            Margin="8,0,4,0"
+                                                            VerticalAlignment="Center">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border x:Name="CopyBtnBorder" Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="CopyBtnBorder" Property="Background" Value="#222228" />
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <Grid>
+                                                            <TextBlock Text="Copy" FontSize="9.5" Foreground="{StaticResource AccentBlueBrush}"
+                                                                       Visibility="{Binding IsJustCopied, Converter={StaticResource InverseBoolToVis}}" />
+                                                            <TextBlock Text="Copied!" FontSize="9.5" FontWeight="SemiBold" Foreground="#10B981"
+                                                                       Visibility="{Binding IsJustCopied, Converter={StaticResource BoolToVis}}" />
+                                                        </Grid>
+                                                    </Button>
+
+                                                    <Button Grid.Column="2"
+                                                            Style="{StaticResource IconButton}"
+                                                            Command="{Binding DataContext.Clips.DeleteClipCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                            CommandParameter="{Binding}"
+                                                            Width="18" Height="18"
+                                                            VerticalAlignment="Center">
+                                                        <Path Data="M 1,1 L 7,7 M 7,1 L 1,7"
+                                                              Stroke="{StaticResource TextMutedBrush}"
+                                                              StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                              Width="7" Height="7" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </ScrollViewer>
+
+                        <!-- Footer -->
+                        <Grid Grid.Row="1">
+                            <TextBlock HorizontalAlignment="Left" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}">
+                                <Run Text="{Binding Clips.Count, Mode=OneWay}" />
+                                <Run Text="saved clips" />
+                            </TextBlock>
+
+                            <Button HorizontalAlignment="Right"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Command="{Binding Clips.ClearAllCommand}">
+                                <TextBlock Text="Clear all" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+
+
+                    <!-- ============================================== -->
+                    <!-- TAB 5: SETTINGS                                -->
+                    <!-- ============================================== -->
+                    <Grid Grid.Row="1" Visibility="{Binding ActiveTab, Converter={local:TabToVisibilityConverter CurrentTab=Settings}}" Margin="0,3,0,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <!-- Run on startup toggle card -->
+                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6.5" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Start on Boot" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Launch WinNotch when Windows starts" FontSize="9.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1"
+                                              IsChecked="{Binding RunOnStartup, Mode=TwoWay}"
+                                              Style="{StaticResource ModernCheckBox}"
+                                              VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Auto-hide on Fullscreen card -->
+                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6.5" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Auto-Hide on Fullscreen" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Conceal notch during fullscreen games &amp; videos" FontSize="9.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1"
+                                              IsChecked="{Binding AutoHideOnFullscreen, Mode=TwoWay}"
+                                              Style="{StaticResource ModernCheckBox}"
+                                              VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Window Position & Reposition Card -->
+                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6.5" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Window Position" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Hold Ctrl + drag notch · Scroll wheel adjusts volume" FontSize="9.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Command="{Binding ResetPositionCommand}"
+                                            Style="{StaticResource TabButton}"
+                                            Background="#141418"
+                                            Foreground="{StaticResource TextPrimaryBrush}"
+                                            Padding="9,3"
+                                            VerticalAlignment="Center"
+                                            ToolTip="Reset to top-center of primary screen">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="M 1,5 L 3,1 L 5,5 M 3,1 L 3,9"
+                                                  Stroke="{StaticResource AccentBlueBrush}"
+                                                  StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  Width="7" Height="7" Stretch="Uniform" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Reset" FontSize="10" FontWeight="Medium" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- About & App info card -->
+                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="WinNotch Dynamic Island" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="AI Coding Agent HUD · agy &amp; Antigravity Monitor" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="#141418" CornerRadius="5" Padding="6,2" VerticalAlignment="Center">
+                                        <TextBlock Text="v2.0" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource TextMutedBrush}" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <!-- Exit WinNotch button -->
+                            <Button Command="{Binding ExitAppCommand}"
+                                    Background="#180B0D"
+                                    BorderBrush="#2C1216"
+                                    BorderThickness="1"
+                                    Cursor="Hand"
+                                    HorizontalAlignment="Center">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="ExitBorder"
+                                                Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="7"
+                                                Padding="18,5">
+                                            <TextBlock Text="Exit WinNotch" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ExitBorder" Property="Background" Value="#280E12" />
+                                                <Setter TargetName="ExitBorder" Property="BorderBrush" Value="#4C1820" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

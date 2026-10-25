@@ -1,0 +1,23 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+publish/
+
+# Visual Studio / Rider / VS Code cache
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs & temp files
+*.log
+*.tmp
+run.log
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

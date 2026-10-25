@@ -28,6 +28,15 @@ namespace WinNotch.Models
         [ObservableProperty]
         private string _statusColor = "#3478F6";
 
+        [ObservableProperty]
+        private string _logoKey = "Antigravity";
+
+        [ObservableProperty]
+        private string _accentColor = "#8B5CF6";
+
+        [ObservableProperty]
+        private string _bgColor = "#140E28";
+
         public void UpdateElapsed()
         {
             var diff = DateTime.Now - StartedAt;

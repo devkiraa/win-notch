@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:WinNotch"
         xmlns:vm="clr-namespace:WinNotch.ViewModels"
         xmlns:models="clr-namespace:WinNotch.Models"
+        xmlns:controls="clr-namespace:WinNotch.Controls"
         mc:Ignorable="d"
         Title="WinNotch"
         Width="520" Height="360"
@@ -72,7 +73,7 @@
                     <!-- REGULAR COLLAPSED CONTENT (Hidden during alerts) -->
                     <Grid Visibility="{Binding HasActiveAlert, Converter={StaticResource InverseBoolToVis}}">
 
-                        <!-- CODING AGENT LIVE PILL (When any agent is running) -->
+                        <!-- CODING AGENT LIVE PILL (STRICTLY when any agent is running) -->
                         <Grid Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource BoolToVis}}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -80,12 +81,25 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <Grid Grid.Column="0" Width="18" Height="18" Margin="0,0,7,0" VerticalAlignment="Center">
-                                <Border Width="18" Height="18" CornerRadius="9" Background="#140E28" BorderBrush="#8B5CF6" BorderThickness="1">
-                                    <TextBlock Text="🤖" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                            </Grid>
+                            <!-- Active running agent logos (strictly currently running agents) -->
+                            <ItemsControl Grid.Column="0" ItemsSource="{Binding Agent.ActiveAgents}" Margin="0,0,7,0" VerticalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type models:AgentInfo}">
+                                        <controls:AgentLogoControl LogoKey="{Binding LogoKey}"
+                                                                  AccentColor="{Binding AccentColor}"
+                                                                  BgColor="{Binding BgColor}"
+                                                                  BoxSize="18"
+                                                                  Margin="0,0,3.5,0" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
+                            <!-- Live Action / Pill Text -->
                             <TextBlock Grid.Column="1"
                                        Text="{Binding Agent.PillDisplay}"
                                        FontSize="11"
@@ -94,8 +108,12 @@
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" />
 
-                            <Border Grid.Column="2" Background="#8B5CF6" CornerRadius="6" Padding="5,1" Margin="6,0,0,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} run'}" FontSize="8.5" FontWeight="Bold" Foreground="#FFFFFF" />
+                            <!-- Live Emerald Badge -->
+                            <Border Grid.Column="2" Background="#0A2016" BorderBrush="#10B981" BorderThickness="0.8" CornerRadius="6" Padding="5,1.5" Margin="6,0,0,0" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="5" Height="5" CornerRadius="2.5" Background="#10B981" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} live'}" FontSize="8.5" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center" />
+                                </StackPanel>
                             </Border>
                         </Grid>
 
@@ -360,110 +378,178 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <!-- Stats Bar -->
+                        <!-- Stats Bar (Installed, Active, Tasks) -->
                         <Grid Grid.Row="0" Margin="0,0,0,8">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
-                            <Border Grid.Column="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,0,4,0">
+                            <!-- 1. Installed Agents Count -->
+                            <Border Grid.Column="0" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8,6" Margin="0,0,3,0">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="8" Height="8" CornerRadius="4" Background="#8B5CF6" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#38BDF8" Margin="0,0,6,0" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} Active'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                        <TextBlock Text="Terminal &amp; IDE" FontSize="9" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding Agent.InstalledCount, StringFormat='{}{0} Agents'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Installed on PC" FontSize="8.5" Foreground="{StaticResource TextMutedBrush}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
 
-                            <Border Grid.Column="1" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="4,0,0,0">
+                            <!-- 2. Active Running Count -->
+                            <Border Grid.Column="1" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8,6" Margin="3,0,3,0">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="8" Height="8" CornerRadius="4" Background="#10B981" Margin="0,0,7,0" VerticalAlignment="Center" />
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#10B981" Margin="0,0,6,0" VerticalAlignment="Center" />
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Agent.CompletedCount, StringFormat='{}{0} Steps'}" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                        <TextBlock Text="Recent Logged" FontSize="9" Foreground="{StaticResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} Active'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Running Now" FontSize="8.5" Foreground="{StaticResource TextMutedBrush}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 3. Completed Tasks Count -->
+                            <Border Grid.Column="2" Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="8,6" Margin="3,0,0,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#8B5CF6" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Agent.CompletedCount, StringFormat='{}{0} Steps'}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Logged Actions" FontSize="8.5" Foreground="{StaticResource TextMutedBrush}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
                         </Grid>
 
-                        <!-- Active Agents List & Recent History -->
+                        <!-- Agent Monitoring & Catalog Scroll -->
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,6">
                             <StackPanel>
-                                <!-- Idle Empty State -->
-                                <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,14" Margin="0,0,0,6"
-                                        Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource InverseBoolToVis}}">
-                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                        <TextBlock Text="⚡ Coding Agents Standing By" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Center" />
-                                        <TextBlock Text="Run 'agy' in terminal or Antigravity to stream live actions" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
-                                    </StackPanel>
-                                </Border>
+                                <!-- ACTIVE RUNNING AGENTS SECTION (When any agent is running) -->
+                                <StackPanel Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource BoolToVis}}" Margin="0,0,0,8">
+                                    <TextBlock Text="LIVE RUNNING AGENTS" FontSize="9" FontWeight="Bold" Foreground="#10B981" Margin="2,0,0,4" />
+                                    
+                                    <ItemsControl ItemsSource="{Binding Agent.ActiveAgents}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type models:AgentInfo}">
+                                                <Border Background="{StaticResource CardBgBrush}" BorderBrush="#1C2E24" BorderThickness="1" CornerRadius="8" Padding="9,6" Margin="0,0,0,4">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
 
-                                <!-- Active Agents Cards -->
-                                <ItemsControl ItemsSource="{Binding Agent.ActiveAgents}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type models:AgentInfo}">
-                                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6.5" Margin="0,0,0,5">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
+                                                        <!-- Vector Logo -->
+                                                        <controls:AgentLogoControl Grid.Column="0"
+                                                                                  LogoKey="{Binding LogoKey}"
+                                                                                  AccentColor="{Binding AccentColor}"
+                                                                                  BgColor="{Binding BgColor}"
+                                                                                  BoxSize="24"
+                                                                                  Margin="0,0,8,0"
+                                                                                  VerticalAlignment="Center" />
 
-                                                    <Border Grid.Column="0" Width="24" Height="24" CornerRadius="6" Background="#140E28" BorderBrush="#8B5CF6" BorderThickness="0.8" Margin="0,0,8,0" VerticalAlignment="Center">
-                                                        <TextBlock Text="🤖" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Border>
-
-                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <TextBlock Text="{Binding AgentName}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-                                                            <TextBlock Text="{Binding ElapsedText, StringFormat='· {0}'}" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding AgentName}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                <TextBlock Text="{Binding ElapsedText, StringFormat='· {0}'}" FontSize="9.5" Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding CurrentAction}" FontSize="10" Foreground="#A78BFA" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
                                                         </StackPanel>
-                                                        <TextBlock Text="{Binding CurrentAction}" FontSize="10" Foreground="#A78BFA" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
-                                                    </StackPanel>
 
-                                                    <Button Grid.Column="2"
-                                                            Style="{StaticResource IconButton}"
-                                                            Command="{Binding DataContext.Agent.KillAgentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                                            CommandParameter="{Binding}"
-                                                            Width="20" Height="20"
-                                                            ToolTip="Stop Process"
-                                                            Visibility="{Binding ProcessId, Converter={StaticResource BoolToVis}}"
-                                                            VerticalAlignment="Center">
-                                                        <Path Data="M 2,2 L 8,8 M 8,2 L 2,8" Stroke="{StaticResource DangerBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="7" Height="7" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Button>
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                                        <Button Grid.Column="2"
+                                                                Style="{StaticResource IconButton}"
+                                                                Command="{Binding DataContext.Agent.KillAgentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Width="20" Height="20"
+                                                                ToolTip="Stop Process"
+                                                                Visibility="{Binding ProcessId, Converter={StaticResource BoolToVis}}"
+                                                                VerticalAlignment="Center">
+                                                            <Path Data="M 2,2 L 8,8 M 8,2 L 2,8" Stroke="{StaticResource DangerBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="7" Height="7" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
 
-                                <!-- Recent Completed Tasks Header -->
-                                <TextBlock Text="COMPLETED ACTIONS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="2,4,0,4"
-                                           Visibility="{Binding Agent.CompletedCount, Converter={StaticResource BoolToVis}}" />
+                                <!-- INSTALLED AGENTS CATALOG -->
+                                <StackPanel Margin="0,0,0,8">
+                                    <Grid Margin="2,0,0,4">
+                                        <TextBlock Text="INSTALLED CODING AGENTS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Left" />
+                                        <TextBlock Text="{Binding Agent.InstalledCount, StringFormat='{}{0} ready'}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" />
+                                    </Grid>
 
-                                <!-- Recent Completed Tasks List -->
-                                <ItemsControl ItemsSource="{Binding Agent.CompletedTasks}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate DataType="{x:Type models:AgentTaskHistory}">
-                                            <Border Background="#09090C" BorderBrush="#16161A" BorderThickness="1" CornerRadius="6" Padding="8,4.5" Margin="0,0,0,3">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
+                                    <ItemsControl ItemsSource="{Binding Agent.InstalledAgents}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type models:InstalledAgent}">
+                                                <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="9,6" Margin="0,0,0,4">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
 
-                                                    <TextBlock Grid.Column="0" Text="{Binding StatusSymbol}" FontSize="9" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                                    <TextBlock Grid.Column="1" Text="{Binding ActionName}" FontSize="9.5" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding FormattedTime}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
-                                                </Grid>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
+                                                        <!-- Vector Logo -->
+                                                        <controls:AgentLogoControl Grid.Column="0"
+                                                                                  LogoKey="{Binding LogoKey}"
+                                                                                  AccentColor="{Binding AccentColor}"
+                                                                                  BgColor="{Binding BgColor}"
+                                                                                  BoxSize="24"
+                                                                                  Margin="0,0,8,0"
+                                                                                  VerticalAlignment="Center" />
+
+                                                        <!-- Name & Type -->
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                                                <TextBlock Text="{Binding TypeLabel, StringFormat='· {0}'}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding ExecutablePath}" FontSize="8.5" Foreground="#52525B" TextTrimming="CharacterEllipsis" Margin="0,1,0,0" />
+                                                        </StackPanel>
+
+                                                        <!-- Status Pill -->
+                                                        <Border Grid.Column="2"
+                                                                CornerRadius="5"
+                                                                Padding="5,1.5"
+                                                                Background="{Binding StatusBg, Converter={local:HexToBrushConverter}}"
+                                                                VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding StatusText}"
+                                                                       FontSize="8.5"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{Binding StatusColor, Converter={local:HexToBrushConverter}}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+
+                                <!-- RECENT COMPLETED TASKS -->
+                                <StackPanel Visibility="{Binding Agent.CompletedCount, Converter={StaticResource BoolToVis}}" Margin="0,0,0,4">
+                                    <TextBlock Text="COMPLETED ACTIONS" FontSize="9" FontWeight="Bold" Foreground="{StaticResource TextMutedBrush}" Margin="2,0,0,4" />
+
+                                    <ItemsControl ItemsSource="{Binding Agent.CompletedTasks}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type models:AgentTaskHistory}">
+                                                <Border Background="#09090C" BorderBrush="#16161A" BorderThickness="1" CornerRadius="6" Padding="8,4.5" Margin="0,0,0,3">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <TextBlock Grid.Column="0" Text="{Binding StatusSymbol}" FontSize="9" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding ActionName}" FontSize="9.5" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding FormattedTime}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                             </StackPanel>
                         </ScrollViewer>
 

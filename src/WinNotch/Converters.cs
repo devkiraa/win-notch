@@ -149,4 +149,34 @@ namespace WinNotch
             throw new NotImplementedException();
         }
     }
+
+    public class HexToBrushConverter : MarkupExtension, IValueConverter
+    {
+        private static readonly BrushConverter _bc = new();
+        private static readonly SolidColorBrush _fallback = new(Color.FromRgb(0x27, 0x27, 0x2A));
+
+        public override object ProvideValue(IServiceProvider serviceProvider) => this;
+
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is string hex && !string.IsNullOrWhiteSpace(hex))
+            {
+                try
+                {
+                    var converted = _bc.ConvertFromString(hex);
+                    if (converted is Brush brush)
+                    {
+                        return brush;
+                    }
+                }
+                catch { }
+            }
+            return _fallback;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }

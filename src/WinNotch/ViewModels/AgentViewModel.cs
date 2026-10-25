@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,10 +14,14 @@ namespace WinNotch.ViewModels
         private readonly CodingAgentService _agentService;
 
         public ObservableCollection<AgentInfo> ActiveAgents { get; } = new();
+        public ObservableCollection<InstalledAgent> InstalledAgents { get; } = new();
         public ObservableCollection<AgentTaskHistory> CompletedTasks { get; } = new();
 
         [ObservableProperty]
         private int _activeCount;
+
+        [ObservableProperty]
+        private int _installedCount;
 
         [ObservableProperty]
         private int _completedCount;
@@ -32,16 +38,20 @@ namespace WinNotch.ViewModels
         [ObservableProperty]
         private string _pillDisplay = "All Idle";
 
+        [ObservableProperty]
+        private AgentInfo? _primaryRunningAgent;
+
         public AgentViewModel(CodingAgentService agentService)
         {
             _agentService = agentService;
             _agentService.AgentsUpdated += OnAgentsUpdated;
         }
 
-        private void OnAgentsUpdated(System.Collections.Generic.List<AgentInfo> active, System.Collections.Generic.List<AgentTaskHistory> completed, string headline)
+        private void OnAgentsUpdated(List<AgentInfo> active, List<InstalledAgent> installed, List<AgentTaskHistory> completed, string headline)
         {
             Application.Current?.Dispatcher.Invoke(() =>
             {
+                // 1. Active running agents
                 ActiveAgents.Clear();
                 foreach (var a in active)
                 {
@@ -49,6 +59,14 @@ namespace WinNotch.ViewModels
                     ActiveAgents.Add(a);
                 }
 
+                // 2. Installed agents catalog
+                InstalledAgents.Clear();
+                foreach (var i in installed)
+                {
+                    InstalledAgents.Add(i);
+                }
+
+                // 3. Completed history
                 CompletedTasks.Clear();
                 foreach (var c in completed)
                 {
@@ -56,14 +74,21 @@ namespace WinNotch.ViewModels
                 }
 
                 ActiveCount = active.Count;
+                InstalledCount = installed.Count(i => i.IsInstalled);
                 CompletedCount = completed.Count;
                 IsAnyAgentRunning = active.Count > 0;
                 ActiveHeadline = headline;
+                PrimaryRunningAgent = active.FirstOrDefault();
 
-                if (active.Count > 0)
+                if (active.Count == 1)
                 {
                     CurrentAction = active[0].CurrentAction;
                     PillDisplay = $"{active[0].AgentName}: {active[0].CurrentAction}";
+                }
+                else if (active.Count > 1)
+                {
+                    CurrentAction = $"{active.Count} agents running";
+                    PillDisplay = $"{active.Count} Agents Active";
                 }
                 else
                 {

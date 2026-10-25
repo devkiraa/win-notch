@@ -73,16 +73,23 @@
                     <!-- REGULAR COLLAPSED CONTENT (Hidden during alerts) -->
                     <Grid Visibility="{Binding HasActiveAlert, Converter={StaticResource InverseBoolToVis}}">
 
-                        <!-- CODING AGENT LIVE PILL (STRICTLY when any agent is running) -->
-                        <Grid Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource BoolToVis}}">
+                        <!-- UNIFIED COLLAPSED ISLAND: Running Chats (left) + Music / Focus / Idle -->
+                        <Grid>
                             <Grid.ColumnDefinitions>
+                                <!-- Col 0: Running Chat Icons (left of album art) -->
                                 <ColumnDefinition Width="Auto" />
+                                <!-- Col 1: Main Content (Media / Focus / Agent Action / Idle) -->
                                 <ColumnDefinition Width="*" />
+                                <!-- Col 2: Right Flank (Equalizer / Focus Pill / Live Badge) -->
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Active running agent logos (strictly currently running agents) -->
-                            <ItemsControl Grid.Column="0" ItemsSource="{Binding Agent.ActiveAgents}" Margin="0,0,7,0" VerticalAlignment="Center">
+                            <!-- COL 0: RUNNING CHATS WITH GREEN STATUS DOT IN BOTTOM-RIGHT -->
+                            <ItemsControl Grid.Column="0"
+                                          ItemsSource="{Binding Agent.ActiveAgents}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,7,0"
+                                          Visibility="{Binding Agent.ActiveCount, Converter={StaticResource BoolToVis}}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <StackPanel Orientation="Horizontal" />
@@ -94,85 +101,23 @@
                                                                   AccentColor="{Binding AccentColor}"
                                                                   BgColor="{Binding BgColor}"
                                                                   BoxSize="18"
-                                                                  Margin="0,0,3.5,0" />
+                                                                  ShowStatusDot="True"
+                                                                  IsRunning="{Binding IsRunning}"
+                                                                  ToolTip="{Binding AgentName}"
+                                                                  Margin="0,0,4,0" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <!-- Live Action / Pill Text -->
-                            <TextBlock Grid.Column="1"
-                                       Text="{Binding Agent.PillDisplay}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimaryBrush}"
-                                       TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center" />
-
-                            <!-- Live Emerald Badge -->
-                            <Border Grid.Column="2" Background="#0A2016" BorderBrush="#10B981" BorderThickness="0.8" CornerRadius="6" Padding="5,1.5" Margin="6,0,0,0" VerticalAlignment="Center">
-                                <StackPanel Orientation="Horizontal">
-                                    <Border Width="5" Height="5" CornerRadius="2.5" Background="#10B981" Margin="0,0,3.5,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} live'}" FontSize="8.5" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <!-- NON-AGENT COLLAPSED CONTENT (When no agents running) -->
-                        <Grid Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource InverseBoolToVis}}">
-
-                            <!-- IDLE NOTCH (MacBook Camera / Dynamic Island pill) -->
-                            <Grid>
-                                <Grid.Style>
-                                    <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding Media.HasMedia}" Value="False" />
-                                                    <Condition Binding="{Binding Focus.IsRunning}" Value="False" />
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </MultiDataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Grid.Style>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Border Width="8" Height="8" CornerRadius="4" Background="#121215" BorderBrush="#202026" BorderThickness="1" Margin="0,0,7,0" />
-                                    <TextBlock Text="WinNotch" FontSize="11" FontWeight="Medium" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- FOCUS TIMER ONLY (When no media playing) -->
-                            <Grid>
-                                <Grid.Style>
-                                    <Style TargetType="Grid">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding Media.HasMedia}" Value="False" />
-                                                    <Condition Binding="{Binding Focus.IsRunning}" Value="True" />
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </MultiDataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Grid.Style>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="⏱" FontSize="11" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding Focus.PillDisplay}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-
-                            <!-- LIVE MEDIA COMPACT PILL -->
-                            <Grid Visibility="{Binding Media.HasMedia, Converter={StaticResource BoolToVis}}">
+                            <!-- COL 1: CENTER CONTENT -->
+                            <!-- Case 1: LIVE MEDIA CONTENT (Album art + Title) -->
+                            <Grid Grid.Column="1" Visibility="{Binding Media.HasMedia, Converter={StaticResource BoolToVis}}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Mini Vinyl Disc -->
+                                <!-- Mini Vinyl Disc (Album Art) -->
                                 <Grid Grid.Column="0" Width="18" Height="18" Margin="0,0,7,0" VerticalAlignment="Center">
                                     <Grid x:Name="MiniVinylDisc" Width="18" Height="18" RenderTransformOrigin="0.5,0.5">
                                         <Grid.RenderTransform>
@@ -203,19 +148,85 @@
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"
                                            VerticalAlignment="Center" />
+                            </Grid>
 
-                                <!-- Flank: Equalizer or Focus Timer Countdown -->
-                                <Grid Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal" Visibility="{Binding Focus.IsRunning, Converter={StaticResource InverseBoolToVis}}">
-                                        <Border x:Name="EqBar1" Width="2.5" Height="8" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
-                                        <Border x:Name="EqBar2" Width="2.5" Height="14" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
-                                        <Border x:Name="EqBar3" Width="2.5" Height="6" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                            <!-- Case 2: NON-MEDIA CONTENT (Agent Action / Focus / Idle) -->
+                            <Grid Grid.Column="1" Visibility="{Binding Media.HasMedia, Converter={StaticResource InverseBoolToVis}}">
+                                <!-- 2A: Agent action text (when agent running) -->
+                                <TextBlock Text="{Binding Agent.PillDisplay}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource BoolToVis}}" />
+
+                                <!-- 2B: Focus timer only (when focus running and no agent) -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Agent.IsAnyAgentRunning}" Value="False" />
+                                                        <Condition Binding="{Binding Focus.IsRunning}" Value="True" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="⏱" FontSize="11" Foreground="{StaticResource AccentBlueBrush}" Margin="0,0,5,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Focus.PillDisplay}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <!-- 2C: Idle Notch (no media, no focus, no agent) -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Agent.IsAnyAgentRunning}" Value="False" />
+                                                        <Condition Binding="{Binding Focus.IsRunning}" Value="False" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Border Width="8" Height="8" CornerRadius="4" Background="#121215" BorderBrush="#202026" BorderThickness="1" Margin="0,0,7,0" />
+                                    <TextBlock Text="WinNotch" FontSize="11" FontWeight="Medium" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- COL 2: RIGHT FLANK -->
+                            <!-- Flank when Media Playing: Equalizer Visualizer Bars -->
+                            <Grid Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center"
+                                  Visibility="{Binding Media.HasMedia, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal" Visibility="{Binding Focus.IsRunning, Converter={StaticResource InverseBoolToVis}}">
+                                    <Border x:Name="EqBar1" Width="2.5" Height="8" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                                    <Border x:Name="EqBar2" Width="2.5" Height="14" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                                    <Border x:Name="EqBar3" Width="2.5" Height="6" Background="{StaticResource AccentBlueBrush}" CornerRadius="1" Margin="1,0" />
+                                </StackPanel>
+
+                                <Border Background="#1C1C1E" CornerRadius="6" Padding="5,1" Visibility="{Binding Focus.IsRunning, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding Focus.PillDisplay}" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource AccentBlueBrush}" />
+                                </Border>
+                            </Grid>
+
+                            <!-- Flank when No Media: Live Emerald Badge -->
+                            <Grid Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center"
+                                  Visibility="{Binding Media.HasMedia, Converter={StaticResource InverseBoolToVis}}">
+                                <Border Background="#0A2016" BorderBrush="#10B981" BorderThickness="0.8" CornerRadius="6" Padding="5,1.5"
+                                        Visibility="{Binding Agent.IsAnyAgentRunning, Converter={StaticResource BoolToVis}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="5" Height="5" CornerRadius="2.5" Background="#10B981" Margin="0,0,3.5,0" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding Agent.ActiveCount, StringFormat='{}{0} live'}" FontSize="8.5" FontWeight="Bold" Foreground="#10B981" VerticalAlignment="Center" />
                                     </StackPanel>
-
-                                    <Border Background="#1C1C1E" CornerRadius="6" Padding="5,1" Visibility="{Binding Focus.IsRunning, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding Focus.PillDisplay}" FontSize="9" FontWeight="SemiBold" Foreground="{StaticResource AccentBlueBrush}" />
-                                    </Border>
-                                </Grid>
+                                </Border>
                             </Grid>
                         </Grid>
                     </Grid>
@@ -438,12 +449,14 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <!-- Vector Logo -->
+                                                        <!-- Vector Logo with Status Dot -->
                                                         <controls:AgentLogoControl Grid.Column="0"
                                                                                   LogoKey="{Binding LogoKey}"
                                                                                   AccentColor="{Binding AccentColor}"
                                                                                   BgColor="{Binding BgColor}"
                                                                                   BoxSize="24"
+                                                                                  ShowStatusDot="True"
+                                                                                  IsRunning="{Binding IsRunning}"
                                                                                   Margin="0,0,8,0"
                                                                                   VerticalAlignment="Center" />
 
@@ -490,12 +503,14 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
 
-                                                        <!-- Vector Logo -->
+                                                        <!-- Vector Logo with Status Dot -->
                                                         <controls:AgentLogoControl Grid.Column="0"
                                                                                   LogoKey="{Binding LogoKey}"
                                                                                   AccentColor="{Binding AccentColor}"
                                                                                   BgColor="{Binding BgColor}"
                                                                                   BoxSize="24"
+                                                                                  ShowStatusDot="True"
+                                                                                  IsRunning="{Binding IsRunning}"
                                                                                   Margin="0,0,8,0"
                                                                                   VerticalAlignment="Center" />
 

@@ -22,6 +22,12 @@ namespace WinNotch.Controls
             DependencyProperty.Register(nameof(BoxCornerRadius), typeof(CornerRadius), typeof(AgentLogoControl),
                 new PropertyMetadata(new CornerRadius(6)));
 
+        public static readonly DependencyProperty ShowStatusDotProperty =
+            DependencyProperty.Register(nameof(ShowStatusDot), typeof(bool), typeof(AgentLogoControl), new PropertyMetadata(false));
+
+        public static readonly DependencyProperty IsRunningProperty =
+            DependencyProperty.Register(nameof(IsRunning), typeof(bool), typeof(AgentLogoControl), new PropertyMetadata(true));
+
         public string LogoKey
         {
             get => (string)GetValue(LogoKeyProperty);
@@ -50,6 +56,18 @@ namespace WinNotch.Controls
         {
             get => (CornerRadius)GetValue(BoxCornerRadiusProperty);
             set => SetValue(BoxCornerRadiusProperty, value);
+        }
+
+        public bool ShowStatusDot
+        {
+            get => (bool)GetValue(ShowStatusDotProperty);
+            set => SetValue(ShowStatusDotProperty, value);
+        }
+
+        public bool IsRunning
+        {
+            get => (bool)GetValue(IsRunningProperty);
+            set => SetValue(IsRunningProperty, value);
         }
 
         private static void OnBoxSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)

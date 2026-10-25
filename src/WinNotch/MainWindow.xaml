@@ -9,7 +9,7 @@
         xmlns:controls="clr-namespace:WinNotch.Controls"
         mc:Ignorable="d"
         Title="WinNotch"
-        Width="520" Height="360"
+        Width="560" Height="380"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -1040,6 +1040,46 @@
                                     </StackPanel>
                                     <CheckBox Grid.Column="1"
                                               IsChecked="{Binding AutoHideOnFullscreen, Mode=TwoWay}"
+                                              Style="{StaticResource ModernCheckBox}"
+                                              VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Collapsed Transparency / Opacity Card -->
+                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6.5" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="130" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Notch Opacity (Collapsed)" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Translucent when idle, solid 100% when open" FontSize="9.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                    <Slider Grid.Column="1"
+                                            Minimum="0.10"
+                                            Maximum="1.0"
+                                            Value="{Binding CollapsedOpacity, Mode=TwoWay}"
+                                            TickFrequency="0.05"
+                                            IsSnapToTickEnabled="True"
+                                            VerticalAlignment="Center"
+                                            Cursor="Hand" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Require Ctrl to Click / Pass-through card -->
+                            <Border Background="{StaticResource CardBgBrush}" BorderBrush="{StaticResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6.5" Margin="0,0,0,6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="Hold CTRL to Click Notch" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+                                        <TextBlock Text="Click apps directly behind notch unless holding CTRL" FontSize="9.5" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,1,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1"
+                                              IsChecked="{Binding RequireCtrlToClick, Mode=TwoWay}"
                                               Style="{StaticResource ModernCheckBox}"
                                               VerticalAlignment="Center" />
                                 </Grid>

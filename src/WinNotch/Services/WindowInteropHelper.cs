@@ -10,6 +10,7 @@ namespace WinNotch.Services
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WS_EX_TOPMOST = 0x00000008;
+        private const int WS_EX_TRANSPARENT = 0x00000020;
 
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private const uint SWP_NOMOVE = 0x0002;
@@ -36,6 +37,27 @@ namespace WinNotch.Services
 
                 int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
                 exStyle |= WS_EX_TOOLWINDOW;
+                SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
+            }
+            catch { }
+        }
+
+        public static void SetClickThrough(Window window, bool clickThrough)
+        {
+            try
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                if (hwnd == IntPtr.Zero) return;
+
+                int exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+                if (clickThrough)
+                {
+                    exStyle |= WS_EX_TRANSPARENT;
+                }
+                else
+                {
+                    exStyle &= ~WS_EX_TRANSPARENT;
+                }
                 SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
             }
             catch { }

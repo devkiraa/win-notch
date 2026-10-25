@@ -28,19 +28,25 @@ namespace WinNotch.ViewModels
         private bool _isExpanded;
 
         [ObservableProperty]
-        private double _notchWidth = 160;
+        private double _notchWidth = 163;
 
         [ObservableProperty]
-        private double _notchHeight = 32;
+        private double _notchHeight = 33;
 
         [ObservableProperty]
-        private double _cornerRadiusValue = 16;
+        private double _cornerRadiusValue = 16.5;
 
         [ObservableProperty]
         private bool _runOnStartup;
 
         [ObservableProperty]
         private bool _autoHideOnFullscreen = true;
+
+        [ObservableProperty]
+        private double _collapsedOpacity = 0.45;
+
+        [ObservableProperty]
+        private bool _requireCtrlToClick = true;
 
         [ObservableProperty]
         private bool _hasActiveAlert;
@@ -72,6 +78,10 @@ namespace WinNotch.ViewModels
 
             RunOnStartup = StartupService.IsRunOnStartupEnabled();
             AutoHideOnFullscreen = SystemStatus.AutoHideOnFullscreen;
+
+            var saved = SettingsStorageService.LoadSettings();
+            _collapsedOpacity = Math.Clamp(saved.CollapsedOpacity, 0.1, 1.0);
+            _requireCtrlToClick = saved.RequireCtrlToClick;
 
             // React to agent changes when collapsed
             Agent.PropertyChanged += (s, e) =>
@@ -225,59 +235,80 @@ namespace WinNotch.ViewModels
             UpdateDimensions();
         }
 
+        public event Action<double>? RequestOpacityChange;
+
+        partial void OnCollapsedOpacityChanged(double value)
+        {
+            RequestOpacityChange?.Invoke(value);
+            SettingsStorageService.SaveSettings(new UserSettings
+            {
+                CollapsedOpacity = value,
+                RequireCtrlToClick = RequireCtrlToClick
+            });
+        }
+
+        partial void OnRequireCtrlToClickChanged(bool value)
+        {
+            SettingsStorageService.SaveSettings(new UserSettings
+            {
+                CollapsedOpacity = CollapsedOpacity,
+                RequireCtrlToClick = value
+            });
+        }
+
         private void UpdateDimensions()
         {
             switch (CurrentState)
             {
                 case NotchState.Idle:
-                    NotchWidth = 160;
-                    NotchHeight = 32;
-                    CornerRadiusValue = 16;
+                    NotchWidth = 163;
+                    NotchHeight = 33;
+                    CornerRadiusValue = 16.5;
                     break;
                 case NotchState.AlertPill:
-                    NotchWidth = 240;
-                    NotchHeight = 32;
-                    CornerRadiusValue = 16;
+                    NotchWidth = 245;
+                    NotchHeight = 33;
+                    CornerRadiusValue = 16.5;
                     break;
                 case NotchState.AgentPill:
-                    NotchWidth = Media.HasMedia ? 300 : 280;
-                    NotchHeight = 32;
-                    CornerRadiusValue = 16;
+                    NotchWidth = Media.HasMedia ? 306 : 286;
+                    NotchHeight = 33;
+                    CornerRadiusValue = 16.5;
                     break;
                 case NotchState.MusicPill:
-                    NotchWidth = Agent.IsAnyAgentRunning ? 300 : (Focus.IsRunning && Media.HasMedia ? 300 : (Focus.IsRunning ? 220 : 260));
-                    NotchHeight = 32;
-                    CornerRadiusValue = 16;
+                    NotchWidth = Agent.IsAnyAgentRunning ? 306 : (Focus.IsRunning && Media.HasMedia ? 306 : (Focus.IsRunning ? 224 : 265));
+                    NotchHeight = 33;
+                    CornerRadiusValue = 16.5;
                     break;
                 case NotchState.AgentsExpanded:
-                    NotchWidth = 380;
-                    NotchHeight = 280;
-                    CornerRadiusValue = 32;
+                    NotchWidth = 388;
+                    NotchHeight = 286;
+                    CornerRadiusValue = 33;
                     break;
                 case NotchState.MusicExpanded:
-                    NotchWidth = 380;
-                    NotchHeight = 172;
-                    CornerRadiusValue = 32;
+                    NotchWidth = 388;
+                    NotchHeight = 175;
+                    CornerRadiusValue = 33;
                     break;
                 case NotchState.TodoExpanded:
-                    NotchWidth = 380;
-                    NotchHeight = 280;
-                    CornerRadiusValue = 32;
+                    NotchWidth = 388;
+                    NotchHeight = 286;
+                    CornerRadiusValue = 33;
                     break;
                 case NotchState.FocusExpanded:
-                    NotchWidth = 380;
-                    NotchHeight = 230;
-                    CornerRadiusValue = 32;
+                    NotchWidth = 388;
+                    NotchHeight = 235;
+                    CornerRadiusValue = 33;
                     break;
                 case NotchState.ClipsExpanded:
-                    NotchWidth = 380;
-                    NotchHeight = 280;
-                    CornerRadiusValue = 32;
+                    NotchWidth = 388;
+                    NotchHeight = 286;
+                    CornerRadiusValue = 33;
                     break;
                 case NotchState.Settings:
-                    NotchWidth = 380;
-                    NotchHeight = 280;
-                    CornerRadiusValue = 32;
+                    NotchWidth = 388;
+                    NotchHeight = 286;
+                    CornerRadiusValue = 33;
                     break;
             }
         }

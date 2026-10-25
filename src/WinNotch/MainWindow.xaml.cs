@@ -52,6 +52,7 @@ namespace WinNotch
 
             _viewModel.PropertyChanged += ViewModel_PropertyChanged;
             _viewModel.RequestResetPosition += ResetToDefaultPosition;
+            _viewModel.RequestOpacityChange += OnRequestOpacityChange;
 
             // Equalizer animation timer
             _equalizerTimer = new DispatcherTimer
@@ -61,6 +62,14 @@ namespace WinNotch
             _equalizerTimer.Tick += EqualizerTimer_Tick;
 
             _viewModel.Media.PropertyChanged += Media_PropertyChanged;
+        }
+
+        private void OnRequestOpacityChange(double newOpacity)
+        {
+            if (!_viewModel.IsExpanded)
+            {
+                NotchBorder.Opacity = newOpacity;
+            }
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -75,6 +84,7 @@ namespace WinNotch
             NotchBorder.Height = _viewModel.NotchHeight;
             NotchBorder.CornerRadius = new CornerRadius(_viewModel.CornerRadiusValue);
             CurrentCornerRadius = _viewModel.CornerRadiusValue;
+            NotchBorder.Opacity = _viewModel.IsExpanded ? 1.0 : _viewModel.CollapsedOpacity;
 
             InitializeVinylAnimation();
             UpdateEqualizer();
@@ -84,6 +94,8 @@ namespace WinNotch
             var helper = new System.Windows.Interop.WindowInteropHelper(this);
             var hwnd = helper.Handle;
 
+            WinNotch.Services.WindowInteropHelper.SetToolWindowAndTopMost(this);
+
             _systemStatusService.Start(hwnd);
             _systemStatusService.FullscreenChanged += OnFullscreenChanged;
 
@@ -91,6 +103,10 @@ namespace WinNotch
             _clipboardService.ClipboardTextChanged += text => _viewModel.Clips.AddClip(text);
 
             _codingAgentService.Start();
+
+            // Setup global hook for CTRL key to toggle WS_EX_TRANSPARENT pass-through
+            UpdateClickThroughState();
+            StartGlobalKeyMonitor();
         }
 
         private void OnFullscreenChanged(bool isFullscreen)
@@ -111,6 +127,7 @@ namespace WinNotch
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
+            _keyMonitorTimer?.Stop();
             _systemStatusService.Stop();
             _clipboardService.Stop();
             _codingAgentService.Stop();
@@ -251,9 +268,12 @@ namespace WinNotch
             NotchBorder.BeginAnimation(HeightProperty, heightAnim);
             BeginAnimation(CurrentCornerRadiusProperty, radiusAnim);
 
-            // Smooth cross-fade and entrance translation
+            // Smooth cross-fade, opacity transition, and entrance translation
             if (_viewModel.IsExpanded)
             {
+                var opacityAnim = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(200));
+                NotchBorder.BeginAnimation(OpacityProperty, opacityAnim);
+
                 var fadeOutCollapsed = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(70));
                 CollapsedView.BeginAnimation(OpacityProperty, fadeOutCollapsed);
 
@@ -273,6 +293,9 @@ namespace WinNotch
             }
             else
             {
+                var opacityAnim = new DoubleAnimation(_viewModel.CollapsedOpacity, TimeSpan.FromMilliseconds(200));
+                NotchBorder.BeginAnimation(OpacityProperty, opacityAnim);
+
                 var fadeOutExpanded = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(70));
                 ExpandedView.BeginAnimation(OpacityProperty, fadeOutExpanded);
 
@@ -283,6 +306,8 @@ namespace WinNotch
                 };
                 CollapsedView.BeginAnimation(OpacityProperty, fadeInCollapsed);
             }
+
+            UpdateClickThroughState();
         }
 
         public void ResetToDefaultPosition()
@@ -329,6 +354,48 @@ namespace WinNotch
             }
         }
 
+        private DispatcherTimer? _keyMonitorTimer;
+        private bool _isCtrlPressed;
+
+        private void StartGlobalKeyMonitor()
+        {
+            _keyMonitorTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(50)
+            };
+            _keyMonitorTimer.Tick += (s, e) =>
+            {
+                // Check state of Left and Right Ctrl (0x11 = VK_CONTROL, 0xA2 = VK_LCONTROL, 0xA3 = VK_RCONTROL)
+                bool ctrlDown = (KeyboardInterop.GetAsyncKeyState(0x11) & 0x8000) != 0;
+                if (ctrlDown != _isCtrlPressed)
+                {
+                    _isCtrlPressed = ctrlDown;
+                    UpdateClickThroughState();
+                }
+            };
+            _keyMonitorTimer.Start();
+        }
+
+        private void UpdateClickThroughState()
+        {
+            // If expanded, always fully interactive and 100% visible
+            if (_viewModel.IsExpanded)
+            {
+                WinNotch.Services.WindowInteropHelper.SetClickThrough(this, false);
+                return;
+            }
+
+            // If RequireCtrlToClick is true and CTRL is NOT held, pass through clicks to underlying apps
+            if (_viewModel.RequireCtrlToClick && !_isCtrlPressed)
+            {
+                WinNotch.Services.WindowInteropHelper.SetClickThrough(this, true);
+            }
+            else
+            {
+                WinNotch.Services.WindowInteropHelper.SetClickThrough(this, false);
+            }
+        }
+
         private void NotchBorder_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left && _viewModel.IsExpanded && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -344,6 +411,12 @@ namespace WinNotch
             {
                 if (!_viewModel.IsExpanded)
                 {
+                    // If RequireCtrlToClick is enabled, verify CTRL was held
+                    if (_viewModel.RequireCtrlToClick && (Keyboard.Modifiers & ModifierKeys.Control) != ModifierKeys.Control && !_isCtrlPressed)
+                    {
+                        return;
+                    }
+
                     _viewModel.IsExpanded = true;
                     e.Handled = true;
                 }
@@ -411,5 +484,11 @@ namespace WinNotch
                 e.Handled = true;
             }
         }
+    }
+
+    internal static class KeyboardInterop
+    {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
     }
 }

@@ -80,15 +80,24 @@ namespace WinNotch.ViewModels
                 ActiveHeadline = headline;
                 PrimaryRunningAgent = active.FirstOrDefault();
 
-                if (active.Count == 1)
+                int workingCount = active.Count(a => a.IsRunning);
+                if (workingCount > 0)
                 {
-                    CurrentAction = active[0].CurrentAction;
-                    PillDisplay = $"{active[0].AgentName}: {active[0].CurrentAction}";
+                    var working = active.First(a => a.IsRunning);
+                    CurrentAction = working.CurrentAction;
+                    PillDisplay = active.Count > 1
+                        ? $"{working.AgentName}: {working.CurrentAction} (+{active.Count - 1} idle)"
+                        : $"{working.AgentName}: {working.CurrentAction}";
+                }
+                else if (active.Count == 1)
+                {
+                    CurrentAction = "Ready for instructions";
+                    PillDisplay = $"{active[0].AgentName}: Ready for instructions";
                 }
                 else if (active.Count > 1)
                 {
-                    CurrentAction = $"{active.Count} agents running";
-                    PillDisplay = $"{active.Count} Agents Active";
+                    CurrentAction = $"{active.Count} chats ready";
+                    PillDisplay = $"{active.Count} Chats Ready";
                 }
                 else
                 {

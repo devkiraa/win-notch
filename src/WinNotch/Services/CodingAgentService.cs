@@ -14,7 +14,7 @@ namespace WinNotch.Services
     {
         private readonly DispatcherTimer _pollTimer;
         private readonly List<AgentTaskHistory> _history = new();
-        private readonly string _brainPath;
+        private readonly List<string> _brainPaths = new();
         private readonly Dictionary<string, int> _lastTranscriptSteps = new();
         private readonly Dictionary<string, string> _chatTitles = new();
 
@@ -24,7 +24,9 @@ namespace WinNotch.Services
         public CodingAgentService()
         {
             var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            _brainPath = Path.Combine(userProfile, ".gemini", "antigravity-ide", "brain");
+            _brainPaths.Add(Path.Combine(userProfile, ".gemini", "antigravity-ide", "brain"));
+            _brainPaths.Add(Path.Combine(userProfile, ".gemini", "antigravity", "brain"));
+            _brainPaths.Add(Path.Combine(userProfile, ".gemini", "antigravity-cli", "brain"));
 
             _pollTimer = new DispatcherTimer
             {
@@ -68,10 +70,16 @@ namespace WinNotch.Services
 
                 // Compute headline
                 string headline = "All agents idle";
-                if (activeAgents.Count > 0)
+                var working = activeAgents.FirstOrDefault(a => a.IsRunning);
+                if (working != null)
                 {
-                    var primary = activeAgents[0];
-                    headline = $"{primary.AgentName}: {primary.CurrentAction}";
+                    headline = $"{working.AgentName}: {working.CurrentAction}";
+                }
+                else if (activeAgents.Count > 0)
+                {
+                    headline = activeAgents.Count == 1
+                        ? $"{activeAgents[0].AgentName}: Ready for instructions"
+                        : $"{activeAgents.Count} chats ready";
                 }
 
                 AgentsUpdated?.Invoke(activeAgents, installedAgents, _history.Take(25).ToList(), headline);
@@ -321,57 +329,68 @@ namespace WinNotch.Services
 
         private void ScanAntigravityBrain(List<AgentInfo> activeAgents, bool isAntigravityRunning)
         {
-            if (!Directory.Exists(_brainPath)) return;
-
             try
             {
-                var brainDir = new DirectoryInfo(_brainPath);
-                var convDirs = brainDir.GetDirectories()
-                    .Where(d => d.Name != "tempmediaStorage")
-                    .ToList();
-
                 var now = DateTime.Now;
-                bool anyChatActive = false;
+                var allConversations = new List<(DirectoryInfo Dir, string TranscriptPath, FileInfo FileInfo)>();
 
-                // Sort by actual transcript.jsonl LastWriteTime, NOT the directory timestamp
-                var activeConversations = new List<(DirectoryInfo Dir, string TranscriptPath, FileInfo FileInfo)>();
-                foreach (var conv in convDirs)
+                foreach (var brainPath in _brainPaths)
                 {
-                    var transcriptPath = Path.Combine(conv.FullName, ".system_generated", "logs", "transcript.jsonl");
-                    if (File.Exists(transcriptPath))
+                    if (!Directory.Exists(brainPath)) continue;
+
+                    var brainDir = new DirectoryInfo(brainPath);
+                    var convDirs = brainDir.GetDirectories()
+                        .Where(d => d.Name != "tempmediaStorage")
+                        .ToList();
+
+                    foreach (var conv in convDirs)
                     {
-                        activeConversations.Add((conv, transcriptPath, new FileInfo(transcriptPath)));
+                        var transcriptPath = Path.Combine(conv.FullName, ".system_generated", "logs", "transcript.jsonl");
+                        if (File.Exists(transcriptPath))
+                        {
+                            allConversations.Add((conv, transcriptPath, new FileInfo(transcriptPath)));
+                        }
                     }
                 }
 
-                activeConversations.Sort((a, b) => b.FileInfo.LastWriteTime.CompareTo(a.FileInfo.LastWriteTime));
+                // Sort newest to oldest
+                allConversations.Sort((a, b) => b.FileInfo.LastWriteTime.CompareTo(a.FileInfo.LastWriteTime));
 
-                foreach (var item in activeConversations)
+                var addedChatIds = new HashSet<string>();
+
+                foreach (var item in allConversations)
                 {
                     try
                     {
                         double ageSec = (now - item.FileInfo.LastWriteTime).TotalSeconds;
-                        // Actively executing if updated in the last 60 seconds
                         bool isChatWorking = ageSec >= 0 && ageSec < 60;
+                        double ageHours = (now - item.FileInfo.LastWriteTime).TotalHours;
 
                         var (stepIndex, type, status, toolSummary, hasRealTool) = ReadLatestTranscriptLine(item.TranscriptPath);
                         string chatTitle = GetChatTitle(item.Dir, item.TranscriptPath);
 
-                        if (isChatWorking)
+                        // If chat is actively working, always include it!
+                        // If chat is idle, include if Antigravity is running and chat was touched recently (last 24 hours), up to 3 chats
+                        bool shouldInclude = isChatWorking || (isAntigravityRunning && ageHours < 24 && addedChatIds.Count < 3);
+
+                        if (shouldInclude && addedChatIds.Add(item.Dir.Name))
                         {
-                            anyChatActive = true;
+                            string actionText = isChatWorking
+                                ? (string.IsNullOrWhiteSpace(toolSummary) ? "Thinking..." : toolSummary)
+                                : "Ready for instructions";
+
                             activeAgents.Add(new AgentInfo
                             {
                                 Id = $"antigravity-{item.Dir.Name}",
                                 ProcessId = Process.GetCurrentProcess().Id,
                                 AgentName = chatTitle,
                                 LogoKey = "Antigravity",
-                                AccentColor = "#8B5CF6",
+                                AccentColor = isChatWorking ? "#10B981" : "#8B5CF6",
                                 BgColor = "#140E28",
-                                CurrentAction = toolSummary,
+                                CurrentAction = actionText,
                                 StartedAt = item.FileInfo.LastWriteTime,
-                                IsRunning = true,
-                                StatusColor = "#8B5CF6"
+                                IsRunning = isChatWorking, // true = green dot when working; false = grey dot when ready for instructions!
+                                StatusColor = isChatWorking ? "#10B981" : "#71717A"
                             });
                         }
 
@@ -411,10 +430,10 @@ namespace WinNotch.Services
                     }
                 }
 
-                // If Antigravity IDE process is open but idle between prompts:
-                if (!anyChatActive && isAntigravityRunning)
+                // Fallback if Antigravity is open but no conversation file found in last 24h
+                if (activeAgents.Count == 0 && isAntigravityRunning)
                 {
-                    var latest = activeConversations.FirstOrDefault();
+                    var latest = allConversations.FirstOrDefault();
                     string fallbackTitle = latest.Dir != null
                         ? GetChatTitle(latest.Dir, latest.TranscriptPath)
                         : "Antigravity IDE";
@@ -429,8 +448,8 @@ namespace WinNotch.Services
                         BgColor = "#140E28",
                         CurrentAction = "Ready for instructions",
                         StartedAt = DateTime.Now,
-                        IsRunning = true,
-                        StatusColor = "#8B5CF6"
+                        IsRunning = false, // Grey dot when ready for instructions!
+                        StatusColor = "#71717A"
                     });
                 }
             }

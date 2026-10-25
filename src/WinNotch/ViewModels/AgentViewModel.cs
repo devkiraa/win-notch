@@ -110,8 +110,21 @@ namespace WinNotch.ViewModels
         [RelayCommand]
         public void KillAgent(AgentInfo? agent)
         {
-            if (agent == null || agent.ProcessId <= 0) return;
-            _agentService.KillProcess(agent.ProcessId);
+            if (agent == null) return;
+
+            // If it's a CLI process (proc-<pid>), kill the process tree
+            if (agent.Id.StartsWith("proc-") && agent.ProcessId > 0)
+            {
+                _agentService.KillProcess(agent.ProcessId);
+            }
+            else
+            {
+                // Dismiss from active list
+                _agentService.DismissChat(agent.Id);
+                ActiveAgents.Remove(agent);
+                ActiveCount = ActiveAgents.Count;
+                IsAnyAgentRunning = ActiveAgents.Count > 0;
+            }
         }
 
         [RelayCommand]

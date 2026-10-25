@@ -17,6 +17,7 @@ namespace WinNotch.Services
         private readonly List<string> _brainPaths = new();
         private readonly Dictionary<string, int> _lastTranscriptSteps = new();
         private readonly Dictionary<string, string> _chatTitles = new();
+        private readonly HashSet<string> _dismissedChatIds = new(StringComparer.OrdinalIgnoreCase);
 
         public event Action<List<AgentInfo>, List<InstalledAgent>, List<AgentTaskHistory>, string>? AgentsUpdated;
         public event Action<string, string, bool>? TaskFinished; // agentName, taskSummary, isSuccess
@@ -33,6 +34,15 @@ namespace WinNotch.Services
                 Interval = TimeSpan.FromMilliseconds(1200)
             };
             _pollTimer.Tick += OnPollTick;
+        }
+
+        public void DismissChat(string chatId)
+        {
+            if (!string.IsNullOrWhiteSpace(chatId))
+            {
+                _dismissedChatIds.Add(chatId);
+                PollNow();
+            }
         }
 
         public void Start()
@@ -297,6 +307,22 @@ namespace WinNotch.Services
                             accentColor = "#22C55E";
                             bgColor = "#052E16";
                         }
+                        else if (name.Contains("codex"))
+                        {
+                            isMatch = true;
+                            agentLabel = "Codex";
+                            logoKey = "Default";
+                            accentColor = "#10A37F";
+                            bgColor = "#0D2821";
+                        }
+                        else if (name.Contains("cursor"))
+                        {
+                            isMatch = true;
+                            agentLabel = "Cursor";
+                            logoKey = "Cursor";
+                            accentColor = "#6366F1";
+                            bgColor = "#141530";
+                        }
 
                         if (isMatch)
                         {
@@ -363,6 +389,11 @@ namespace WinNotch.Services
                 {
                     try
                     {
+                        if (_dismissedChatIds.Contains(item.Dir.Name) || _dismissedChatIds.Contains($"antigravity-{item.Dir.Name}"))
+                        {
+                            continue;
+                        }
+
                         double ageSec = (now - item.FileInfo.LastWriteTime).TotalSeconds;
                         // Extended active window: 120s ensures ongoing agent turn is not prematurely marked idle
                         bool isChatWorking = ageSec >= 0 && ageSec < 120;
@@ -371,7 +402,8 @@ namespace WinNotch.Services
                         var (stepIndex, type, status, toolSummary, hasRealTool) = ReadLatestTranscriptLine(item.TranscriptPath);
                         string chatTitle = GetChatTitle(item.Dir.Name, item.TranscriptPath);
 
-                        bool shouldInclude = isChatWorking || (isAntigravityRunning && ageHours < 24 && addedChatIds.Count < 3);
+                        // Working chat is always included; recent chat included only if not dismissed
+                        bool shouldInclude = isChatWorking || (isAntigravityRunning && ageHours < 8 && addedChatIds.Count < 2);
 
                         if (shouldInclude && addedChatIds.Add(item.Dir.Name))
                         {
@@ -487,8 +519,13 @@ namespace WinNotch.Services
                         double ageSec = (now - dbFi.LastWriteTime).TotalSeconds;
                         double ageHours = (now - dbFi.LastWriteTime).TotalHours;
 
-                        // Only consider workspaces modified recently (last 8 hours)
-                        if (ageHours > 8) continue;
+                        // Only consider workspaces modified recently (last 4 hours)
+                        if (ageHours > 4) continue;
+
+                        if (_dismissedChatIds.Contains(ws.Name) || _dismissedChatIds.Contains($"ws-{ws.Name}"))
+                        {
+                            continue;
+                        }
 
                         // Check if this workspace has a custom session title or project folder
                         string title = ExtractWorkspaceTitle(ws.FullName);
@@ -501,11 +538,12 @@ namespace WinNotch.Services
                             continue;
                         }
 
-                        if (addedChatIds.Add(ws.Name))
-                        {
-                            // If state.vscdb was touched in last 120s, workspace session is actively working!
-                            bool isWorking = ageSec >= 0 && ageSec < 120;
+                        // If state.vscdb was touched in last 120s, workspace session is actively working!
+                        bool isWorking = ageSec >= 0 && ageSec < 120;
 
+                        // Only include if working or if active list is empty/small
+                        if ((isWorking || addedChatIds.Count < 2) && addedChatIds.Add(ws.Name))
+                        {
                             activeAgents.Add(new AgentInfo
                             {
                                 Id = $"ws-{ws.Name}",

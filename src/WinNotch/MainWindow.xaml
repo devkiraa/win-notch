@@ -473,7 +473,7 @@
                                                                 Command="{Binding DataContext.Agent.KillAgentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                 CommandParameter="{Binding}"
                                                                 Width="20" Height="20"
-                                                                ToolTip="Stop Process"
+                                                                ToolTip="Close / Dismiss"
                                                                 Visibility="{Binding ProcessId, Converter={StaticResource BoolToVis}}"
                                                                 VerticalAlignment="Center">
                                                             <Path Data="M 2,2 L 8,8 M 8,2 L 2,8" Stroke="{StaticResource DangerBrush}" StrokeThickness="1.4" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="7" Height="7" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />

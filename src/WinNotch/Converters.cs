@@ -29,6 +29,31 @@ namespace WinNotch
         }
     }
 
+    public class BoolOrCountToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool b)
+            {
+                return b ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (value is int count)
+            {
+                return count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (value != null)
+            {
+                return Visibility.Visible;
+            }
+            return Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public class TodoStrikeThroughConverter : IValueConverter
     {
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)

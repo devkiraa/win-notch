@@ -240,12 +240,12 @@ namespace WinNotch.ViewModels
                     CornerRadiusValue = 16;
                     break;
                 case NotchState.AgentPill:
-                    NotchWidth = 280;
+                    NotchWidth = Media.HasMedia ? 300 : 280;
                     NotchHeight = 32;
                     CornerRadiusValue = 16;
                     break;
                 case NotchState.MusicPill:
-                    NotchWidth = Focus.IsRunning && Media.HasMedia ? 300 : (Focus.IsRunning ? 220 : 260);
+                    NotchWidth = Agent.IsAnyAgentRunning ? 300 : (Focus.IsRunning && Media.HasMedia ? 300 : (Focus.IsRunning ? 220 : 260));
                     NotchHeight = 32;
                     CornerRadiusValue = 16;
                     break;

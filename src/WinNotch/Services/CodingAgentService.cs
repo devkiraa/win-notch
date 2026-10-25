@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows.Threading;
 using WinNotch.Models;
 
@@ -14,7 +15,8 @@ namespace WinNotch.Services
         private readonly DispatcherTimer _pollTimer;
         private readonly List<AgentTaskHistory> _history = new();
         private readonly string _brainPath;
-        private int _lastTranscriptStep = -1;
+        private readonly Dictionary<string, int> _lastTranscriptSteps = new();
+        private readonly Dictionary<string, string> _chatTitles = new();
 
         public event Action<List<AgentInfo>, List<InstalledAgent>, List<AgentTaskHistory>, string>? AgentsUpdated;
         public event Action<string, string, bool>? TaskFinished; // agentName, taskSummary, isSuccess
@@ -52,15 +54,17 @@ namespace WinNotch.Services
             try
             {
                 var activeAgents = new List<AgentInfo>();
+                var allProcs = Process.GetProcesses();
+                bool isAntigravityRunning = allProcs.Any(p => p.ProcessName.Contains("Antigravity", StringComparison.OrdinalIgnoreCase));
 
-                // 1. Scan running processes
-                ScanAgentProcesses(activeAgents);
+                // 1. Scan running CLI / terminal processes
+                ScanAgentProcesses(activeAgents, allProcs);
 
                 // 2. Scan Antigravity IDE brain activity
-                ScanAntigravityBrain(activeAgents);
+                ScanAntigravityBrain(activeAgents, isAntigravityRunning);
 
                 // 3. Scan installed coding agents catalog
-                var installedAgents = ScanInstalledAgents(activeAgents);
+                var installedAgents = ScanInstalledAgents(activeAgents, isAntigravityRunning);
 
                 // Compute headline
                 string headline = "All agents idle";
@@ -110,7 +114,7 @@ namespace WinNotch.Services
             return false;
         }
 
-        private List<InstalledAgent> ScanInstalledAgents(List<AgentInfo> activeAgents)
+        private List<InstalledAgent> ScanInstalledAgents(List<AgentInfo> activeAgents, bool isAntigravityRunning)
         {
             var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -223,21 +227,25 @@ namespace WinNotch.Services
             // Mark running status
             foreach (var item in catalog)
             {
-                bool isRunning = activeAgents.Any(a => a.AgentName.Contains(item.Name, StringComparison.OrdinalIgnoreCase) ||
-                                                       item.Name.Contains(a.AgentName, StringComparison.OrdinalIgnoreCase) ||
-                                                       string.Equals(a.LogoKey, item.LogoKey, StringComparison.OrdinalIgnoreCase));
-                item.IsRunning = isRunning;
+                if (item.Id == "antigravity")
+                {
+                    item.IsRunning = isAntigravityRunning || activeAgents.Any(a => a.LogoKey == "Antigravity");
+                }
+                else
+                {
+                    item.IsRunning = activeAgents.Any(a => a.AgentName.Contains(item.Name, StringComparison.OrdinalIgnoreCase) ||
+                                                           item.Name.Contains(a.AgentName, StringComparison.OrdinalIgnoreCase) ||
+                                                           string.Equals(a.LogoKey, item.LogoKey, StringComparison.OrdinalIgnoreCase));
+                }
             }
 
             return catalog;
         }
 
-        private void ScanAgentProcesses(List<AgentInfo> activeAgents)
+        private void ScanAgentProcesses(List<AgentInfo> activeAgents, Process[] allProcs)
         {
             try
             {
-                var allProcs = Process.GetProcesses();
-
                 foreach (var proc in allProcs)
                 {
                     try
@@ -311,25 +319,128 @@ namespace WinNotch.Services
             catch { }
         }
 
-        private void ScanAntigravityBrain(List<AgentInfo> activeAgents)
+        private void ScanAntigravityBrain(List<AgentInfo> activeAgents, bool isAntigravityRunning)
         {
             if (!Directory.Exists(_brainPath)) return;
 
             try
             {
                 var brainDir = new DirectoryInfo(_brainPath);
-                var latestConv = brainDir.GetDirectories()
+                var convDirs = brainDir.GetDirectories()
                     .Where(d => d.Name != "tempmediaStorage")
-                    .OrderByDescending(d => d.LastWriteTime)
-                    .FirstOrDefault();
+                    .ToList();
 
-                if (latestConv == null) return;
+                var now = DateTime.Now;
+                bool anyChatActive = false;
 
-                var logsPath = Path.Combine(latestConv.FullName, ".system_generated", "logs");
-                var transcriptPath = Path.Combine(logsPath, "transcript.jsonl");
+                // Sort by actual transcript.jsonl LastWriteTime, NOT the directory timestamp
+                var activeConversations = new List<(DirectoryInfo Dir, string TranscriptPath, FileInfo FileInfo)>();
+                foreach (var conv in convDirs)
+                {
+                    var transcriptPath = Path.Combine(conv.FullName, ".system_generated", "logs", "transcript.jsonl");
+                    if (File.Exists(transcriptPath))
+                    {
+                        activeConversations.Add((conv, transcriptPath, new FileInfo(transcriptPath)));
+                    }
+                }
 
-                if (!File.Exists(transcriptPath)) return;
+                activeConversations.Sort((a, b) => b.FileInfo.LastWriteTime.CompareTo(a.FileInfo.LastWriteTime));
 
+                foreach (var item in activeConversations)
+                {
+                    try
+                    {
+                        double ageSec = (now - item.FileInfo.LastWriteTime).TotalSeconds;
+                        // Actively executing if updated in the last 60 seconds
+                        bool isChatWorking = ageSec >= 0 && ageSec < 60;
+
+                        var (stepIndex, type, status, toolSummary, hasRealTool) = ReadLatestTranscriptLine(item.TranscriptPath);
+                        string chatTitle = GetChatTitle(item.Dir, item.TranscriptPath);
+
+                        if (isChatWorking)
+                        {
+                            anyChatActive = true;
+                            activeAgents.Add(new AgentInfo
+                            {
+                                Id = $"antigravity-{item.Dir.Name}",
+                                ProcessId = Process.GetCurrentProcess().Id,
+                                AgentName = chatTitle,
+                                LogoKey = "Antigravity",
+                                AccentColor = "#8B5CF6",
+                                BgColor = "#140E28",
+                                CurrentAction = toolSummary,
+                                StartedAt = item.FileInfo.LastWriteTime,
+                                IsRunning = true,
+                                StatusColor = "#8B5CF6"
+                            });
+                        }
+
+                        // Track completed steps - NEVER LOG "Thinking..." TO HISTORY!
+                        int lastStep = _lastTranscriptSteps.TryGetValue(item.Dir.Name, out int s) ? s : -1;
+                        if (stepIndex > lastStep)
+                        {
+                            bool isThinking = !hasRealTool ||
+                                              string.IsNullOrWhiteSpace(toolSummary) ||
+                                              toolSummary.Equals("Thinking...", StringComparison.OrdinalIgnoreCase) ||
+                                              toolSummary.Equals("Executing tool", StringComparison.OrdinalIgnoreCase) ||
+                                              toolSummary.StartsWith("Thinking", StringComparison.OrdinalIgnoreCase);
+
+                            if (!isThinking && lastStep != -1)
+                            {
+                                var lastHistory = _history.FirstOrDefault();
+                                if (lastHistory == null || !string.Equals(lastHistory.ActionName, toolSummary, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var historyItem = new AgentTaskHistory
+                                    {
+                                        AgentName = chatTitle,
+                                        ActionName = toolSummary,
+                                        CompletedAt = DateTime.Now,
+                                        IsSuccess = status != "ERROR",
+                                        DurationText = "Done"
+                                    };
+                                    _history.Insert(0, historyItem);
+                                    TaskFinished?.Invoke(chatTitle, toolSummary, status != "ERROR");
+                                }
+                            }
+                            _lastTranscriptSteps[item.Dir.Name] = stepIndex;
+                        }
+                    }
+                    catch
+                    {
+                        // Skip locked conversation
+                    }
+                }
+
+                // If Antigravity IDE process is open but idle between prompts:
+                if (!anyChatActive && isAntigravityRunning)
+                {
+                    var latest = activeConversations.FirstOrDefault();
+                    string fallbackTitle = latest.Dir != null
+                        ? GetChatTitle(latest.Dir, latest.TranscriptPath)
+                        : "Antigravity IDE";
+
+                    activeAgents.Add(new AgentInfo
+                    {
+                        Id = "antigravity-idle",
+                        ProcessId = Process.GetCurrentProcess().Id,
+                        AgentName = fallbackTitle,
+                        LogoKey = "Antigravity",
+                        AccentColor = "#8B5CF6",
+                        BgColor = "#140E28",
+                        CurrentAction = "Ready for instructions",
+                        StartedAt = DateTime.Now,
+                        IsRunning = true,
+                        StatusColor = "#8B5CF6"
+                    });
+                }
+            }
+            catch { }
+        }
+
+        private static (int StepIndex, string Type, string Status, string ToolSummary, bool HasRealTool) ReadLatestTranscriptLine(string transcriptPath)
+        {
+            try
+            {
                 using var fs = new FileStream(transcriptPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var reader = new StreamReader(fs);
 
@@ -344,7 +455,7 @@ namespace WinNotch.Services
                     }
                 }
 
-                if (lines.Count == 0) return;
+                if (lines.Count == 0) return (0, "", "", "Thinking...", false);
 
                 var latestLine = lines[^1];
                 using var doc = JsonDocument.Parse(latestLine);
@@ -354,7 +465,9 @@ namespace WinNotch.Services
                 string type = root.TryGetProperty("type", out var t) ? t.GetString() ?? "" : "";
                 string status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "" : "";
 
-                string currentToolSummary = "Thinking...";
+                string toolSummary = "Thinking...";
+                bool hasRealTool = false;
+
                 if (root.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.GetArrayLength() > 0)
                 {
                     var firstTool = toolCalls[0];
@@ -362,55 +475,81 @@ namespace WinNotch.Services
                     {
                         if (args.TryGetProperty("toolAction", out var act))
                         {
-                            currentToolSummary = act.GetString()?.Trim('\"') ?? "Executing tool";
+                            var actStr = act.GetString()?.Trim('\"');
+                            if (!string.IsNullOrWhiteSpace(actStr))
+                            {
+                                toolSummary = actStr;
+                                hasRealTool = true;
+                            }
                         }
                         else if (args.TryGetProperty("toolSummary", out var summ))
                         {
-                            currentToolSummary = summ.GetString()?.Trim('\"') ?? "Executing tool";
+                            var summStr = summ.GetString()?.Trim('\"');
+                            if (!string.IsNullOrWhiteSpace(summStr))
+                            {
+                                toolSummary = summStr;
+                                hasRealTool = true;
+                            }
                         }
                     }
                 }
 
-                bool isRecent = (DateTime.Now - latestConv.LastWriteTime).TotalSeconds < 15;
+                return (stepIndex, type, status, toolSummary, hasRealTool);
+            }
+            catch
+            {
+                return (0, "", "", "Thinking...", false);
+            }
+        }
 
-                if (isRecent)
-                {
-                    activeAgents.Insert(0, new AgentInfo
-                    {
-                        Id = "antigravity-active",
-                        ProcessId = Process.GetCurrentProcess().Id,
-                        AgentName = "Antigravity",
-                        LogoKey = "Antigravity",
-                        AccentColor = "#8B5CF6",
-                        BgColor = "#140E28",
-                        CurrentAction = currentToolSummary,
-                        StartedAt = latestConv.LastWriteTime,
-                        IsRunning = true,
-                        StatusColor = "#8B5CF6"
-                    });
-                }
+        private string GetChatTitle(DirectoryInfo conv, string transcriptPath)
+        {
+            if (_chatTitles.TryGetValue(conv.Name, out var cached))
+            {
+                return cached;
+            }
 
-                if (stepIndex > _lastTranscriptStep)
+            string title = "Antigravity";
+            try
+            {
+                using var fs = new FileStream(transcriptPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                string? firstLine = reader.ReadLine();
+                if (!string.IsNullOrWhiteSpace(firstLine))
                 {
-                    if (_lastTranscriptStep != -1 && (type == "RUN_COMMAND" || type == "PLANNER_RESPONSE"))
+                    var matchRepo = Regex.Match(firstLine, @"(?:Repository|workspace|projects?)[\\/]([a-zA-Z0-9_\-\.]+)", RegexOptions.IgnoreCase);
+                    if (matchRepo.Success && matchRepo.Groups.Count > 1)
                     {
-                        bool isSuccess = status != "ERROR";
-                        var historyItem = new AgentTaskHistory
+                        var repo = matchRepo.Groups[1].Value.Trim();
+                        if (!string.Equals(repo, "Repository", StringComparison.OrdinalIgnoreCase))
                         {
-                            AgentName = "Antigravity",
-                            ActionName = currentToolSummary,
-                            CompletedAt = DateTime.Now,
-                            IsSuccess = isSuccess,
-                            DurationText = "Done"
-                        };
-                        _history.Insert(0, historyItem);
-
-                        TaskFinished?.Invoke("Antigravity", currentToolSummary, isSuccess);
+                            title = $"Antigravity · {repo}";
+                        }
                     }
-                    _lastTranscriptStep = stepIndex;
+
+                    if (title == "Antigravity")
+                    {
+                        var matchCorpus = Regex.Match(firstLine, @"->\s*([a-zA-Z0-9_\-\./]+)");
+                        if (matchCorpus.Success && matchCorpus.Groups.Count > 1)
+                        {
+                            var name = matchCorpus.Groups[1].Value.Trim().Split('/').Last();
+                            if (!string.IsNullOrWhiteSpace(name))
+                            {
+                                title = $"Antigravity · {name}";
+                            }
+                        }
+                    }
                 }
             }
             catch { }
+
+            if (title == "Antigravity")
+            {
+                title = $"Antigravity · #{conv.Name.Substring(0, Math.Min(4, conv.Name.Length))}";
+            }
+
+            _chatTitles[conv.Name] = title;
+            return title;
         }
 
         public void KillProcess(int processId)

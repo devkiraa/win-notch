@@ -542,7 +542,12 @@
                                                         </Grid.ColumnDefinitions>
 
                                                         <TextBlock Grid.Column="0" Text="{Binding StatusSymbol}" FontSize="9" Margin="0,0,6,0" VerticalAlignment="Center" />
-                                                        <TextBlock Grid.Column="1" Text="{Binding ActionName}" FontSize="9.5" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Border Background="#140E28" BorderBrush="#8B5CF6" BorderThickness="0.6" CornerRadius="4" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding AgentName}" FontSize="8" FontWeight="SemiBold" Foreground="#A78BFA" />
+                                                            </Border>
+                                                            <TextBlock Text="{Binding ActionName}" FontSize="9.5" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                        </StackPanel>
                                                         <TextBlock Grid.Column="2" Text="{Binding FormattedTime}" FontSize="9" Foreground="{StaticResource TextMutedBrush}" Margin="6,0,0,0" VerticalAlignment="Center" />
                                                     </Grid>
                                                 </Border>
